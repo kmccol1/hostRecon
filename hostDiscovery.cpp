@@ -1,9 +1,9 @@
 //****************************************************************************************
 //
-//Filename:    hostDiscovery.cpp
-//Date:        3 January 2024
-//Author:      Kyle McColgan
-//Description: This program performs an ICMP Echo request using the libpcap library.
+//    Filename:    hostDiscovery.cpp
+//    Date:        3 January 2024
+//    Author:      Kyle McColgan
+//    Description: This program performs an ICMP Echo request using the libpcap library.
 //
 //****************************************************************************************
 
@@ -15,17 +15,138 @@
 #include <netinet/udp.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/ether.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <sys/time.h>
 using namespace std;
+
+#define PACKET_SIZE 64
+#define BUFFER_SIZE 1024
 
 //****************************************************************************************
 
 void printMenu()
 {
     cout << "\n----------MENU----------" << endl;
-    cout << "A....Inject an ICMP packet onto the network." << endl;
+    cout << "A....Inject an ICMP packet onto the network using pcap." << endl;
+    cout << "R....Inject an ICMP packet onto the network using a raw socket." << endl;
     cout << "Q....Quit and close any remaining open sessions." << endl;
     cout << "\nPlease input the letter of your selection from the menu: ";
 }
+
+//****************************************************************************************
+
+int sendRawPacket(int mySocketFlag)
+{
+    //Must be root SUID(0) for raw socket opening and sending.
+    int successFlag = 1;
+
+    //Create the ICMP Packet
+    char packet [PACKET_SIZE];
+
+    memset(packet,0,PACKET_SIZE);
+
+    struct icmphdr *icmp_header = (struct icmphdr*) (packet);
+    icmp_header->type = ICMP_ECHO;
+    icmp_header->code = 0;
+    icmp_header->checksum=0;
+    icmp_header->un.echo.id=htons(4321);
+    icmp_header->un.echo.sequence=0;
+
+    //Set the destination IP address
+    struct sockaddr_in dest_addr;
+    dest_addr.sin_family = AF_INET;
+    //dest_addr.sin_port=0;
+    //Use same port number as receiveRawPacket() below...
+    dest_addr.sin_port=htons(1234);
+
+    if (inet_pton(AF_INET, "192.168.1.94", &(dest_addr.sin_addr)) <= 0 )
+    {
+        cout << "inet_pton() failed..." << endl;
+        successFlag = 0;
+    }
+
+    //Send the ICMP Packet
+    if ( sendto(mySocketFlag, packet, PACKET_SIZE, 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) < 0)
+    {
+        cout << "Error: Socket sending failed..." << endl;
+        successFlag = 0;
+    }
+
+    cout << "ICMP Packet sent successfully!" << endl;
+
+    return successFlag;
+}
+
+//****************************************************************************************
+
+int receiveRawPacket(int mySocketFlag)
+{
+    //Must be root SUID(0) for raw socket opening and sending.
+    int successFlag = 1;
+    //int mySocketFlag;
+
+    struct sockaddr_in server_addr,client_addr;
+    char buffer [BUFFER_SIZE];
+    ssize_t numBytes;
+
+    //Bind socket to addr and port
+    server_addr.sin_family = AF_INET;
+    //server_addr.sin_addr.s_addr= INADDR_ANY;
+    //Bind correctly below....
+    server_addr.sin_addr.s_addr= inet_addr("192.168.1.218");
+    server_addr.sin_port =htons(1234);
+
+    cout << "Binding socket..." << endl;
+
+    if (bind(mySocketFlag, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+    {
+        cout << "Error: Socket binding failed..." << endl;
+        successFlag = 0;
+    }
+    else
+    {
+        cout << "Socket binded successfully!" << endl;
+    }
+
+    //Set the receive timeout here...need to loop send until a response is received???
+    struct timeval timeout;
+    timeout.tv_sec = 5; //5 second timeout...
+    timeout.tv_usec = 0;
+
+    if (setsockopt(mySocketFlag, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)) < 0)
+    {
+        cout << "Setting socket options failed...." << endl;
+    }
+
+    //Receieve a single ICMP response
+    socklen_t client_addr_len = sizeof(client_addr);
+    successFlag = sendRawPacket(mySocketFlag);
+    cout << "Getting the response..." << endl;
+    numBytes = recvfrom(mySocketFlag, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&client_addr, &client_addr_len);
+    cout << "Captured a response..." << endl;
+    if(numBytes < 0)
+    {
+        cout << "Error: Socket recieving failed..." << endl;
+        successFlag = 0;
+    }
+
+    //Extract the reply address
+    char client_ip [INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &(client_addr.sin_addr), client_ip, INET_ADDRSTRLEN);
+    int client_port = ntohs(client_addr.sin_port);
+
+    //Process the received packet
+    cout << "Received packet from: " << client_ip << " on port #" << client_port << endl;
+    cout << "Packet contents: " << int(numBytes) << buffer << endl;
+
+
+
+    return successFlag;
+}
+
+
+
 
 //****************************************************************************************
 
@@ -98,51 +219,6 @@ int injectICMPPacket()
         cout << "Could not open the device..." << errorMsg << endl;
         returnFlag = -1;
     }
-    /*
-    //Construct the ICMP packet...
-    cout << "Building an ICMP Packet..." << endl;
-    char packetData [64];
-    memset (packetData, 0, sizeof(packetData));
-
-    struct ip * ipHeader = (struct ip*) packetData;
-    struct icmphdr * icmpHeader = (struct icmphdr *)(packetData + sizeof(struct ip));
-
-    ipHeader->ip_hl = 5;
-    ipHeader->ip_v = 4;
-    ipHeader->ip_tos = 0;
-    ipHeader->ip_len = sizeof(struct ip) + sizeof(struct icmphdr);
-    ipHeader->ip_id = htons(1234);
-    ipHeader->ip_off = 0;
-    ipHeader->ip_ttl = 64;
-    ipHeader->ip_p = IPPROTO_ICMP;
-    ipHeader->ip_sum = 0;
-    ipHeader->ip_src.s_addr = inet_addr("192.168.1.218");
-    ipHeader->ip_dst.s_addr = inet_addr("192.168.1.94");
-
-    icmpHeader->type = ICMP_ECHO;
-    icmpHeader->code = 0;
-    icmpHeader->checksum = 0;
-    icmpHeader->un.echo.id = htons(1234);
-    icmpHeader->un.echo.sequence = htons(1);
-
-    unsigned short * buf = (unsigned short*) icmpHeader;
-    int len = sizeof(struct icmphdr);
-    unsigned int sum = 0;
-
-    while (len >1 )
-    {
-        sum += *buf;
-        buf++;
-        len -= 2;
-
-        if ( len == 1)
-            sum += *(unsigned char*) buf;
-    }
-
-    sum = (sum >> 16) + (sum & 0xFFFF);
-    sum += (sum >> 16);
-    icmpHeader->checksum = ~sum;
-    */
 
     //Build the packet for injection...
 
@@ -187,19 +263,21 @@ char getUserChoice()
     {
         cin >> choice;
 
-        if ((choice != 'a' && choice != 'A') && (choice != 'q' && choice != 'Q'))
+        if ((choice != 'a' && choice != 'A') && (choice != 'r' && choice != 'R') \
+         && (choice != 'q' && choice != 'Q'))
         {
             cout << "Error: Please enter a valid menu option." << endl;
         }
     }
-    while ((choice != 'a' && choice != 'A') && (choice != 'q' && choice != 'Q'));
+    while ((choice != 'a' && choice != 'A') && (choice != 'r' && choice != 'R') \
+        && (choice != 'q' && choice != 'Q'));
 
     return choice;
 }
 
 //****************************************************************************************
 
-void processUserChoice(char choice)
+void processUserChoice(int mySocketFlag, char choice)
 {
     switch(choice)
     {
@@ -208,6 +286,20 @@ void processUserChoice(char choice)
             break;
         case 'a':
             injectICMPPacket();
+            break;
+        case 'R':
+            //if ( sendRawPacket(mySocketFlag) == 1)
+            if ( receiveRawPacket(mySocketFlag) == 1)
+                cout << "Successfully pinged!" << endl;
+            else
+                cout << "Error during ping..." << endl;
+            break;
+        case 'r':
+            //if ( sendRawPacket(mySocketFlag) == 1)
+            if ( receiveRawPacket(mySocketFlag) == 1)
+                cout << "Successfully pinged!" << endl;
+            else
+                cout << "Error during ping..." << endl;
             break;
         case 'Q':
             break;
@@ -296,108 +388,61 @@ void myCallback(u_char * useless, const struct pcap_pkthdr *pkthdr, const u_char
 
 //****************************************************************************************
 
-
 int main()
 {
-    /*
-    pcap_if_t * myDevice;
-    char errorMsg[PCAP_ERRBUF_SIZE];
-
-    const void * packetData;
-    int deviceFlag;
-    int numBytesWritten;
-
-    pcap_t * sessionHandle; //return valuepcap_close(sessionHandle); from pcap_open_live
-    pcap_t * listenHandle; //For capturing response packets for example an ICMP Echo response.
-    size_t packetLen;
-    int numPackets;
-
-    //pcap_lookupdev has been deprecated, use pcap_findalldevs instead.
-    //device = pcap_lookupdev(errorMsg);
-    cout << "Finding a valid interface for injection..." << endl;
-    deviceFlag = pcap_findalldevs(&myDevice, errorMsg);
-
-    if ( deviceFlag != 0 )
-    {
-        cout << "Could not find default device." << endl;
-    }
-    else if ( deviceFlag == PCAP_ERROR)
-    {
-        cout << "Error reading the device list." << endl;
-    }
-
-    cout << "Found device named: " << myDevice->name << endl;
-
-    //open the device for injection....this must be run as root (sudo).
-    cout << "Opening the device for injection..." << endl;
-    sessionHandle = pcap_open_live (myDevice->name, PCAP_ERRBUF_SIZE, 1, 1000, errorMsg);
-
-    if ( sessionHandle == NULL )
-    {
-        cout << "Could not open the device..." << errorMsg << endl;
-    }
-
-    listenHandle = pcap_open_live (myDevice->name, PCAP_ERRBUF_SIZE, 1, 1000, errorMsg);
-
-    if (listenHandle == NULL)
-    {
-        cout << "Error opening listening device session handle for response capture..." << endl;
-        cout << "Closing the listening handle..." << endl;
-        pcap_close(listenHandle);
-    }
-    //Here we will need to filter for ICMP packets to only get the response we want.
-    struct bpf_program bpf;
-    char filterExp[] = "icmp[0]==0"; //ICMP response type is 0.
-    if (pcap_compile(listenHandle, &bpf, filterExp, 0, PCAP_NETMASK_UNKNOWN) == -1)
-    {
-        cout << "Error compiling the filter..." << endl;
-        cout << "Closing the listening handle and exiting..." << endl;
-        pcap_close(listenHandle);
-        return 1;
-    }
-
-    if (pcap_setfilter(listenHandle, &bpf) == -1)
-    {
-        cout << "Error setting the filter..." << endl;
-        cout << "Closing the listening handle and exiting..." << endl;
-        pcap_close(listenHandle);
-        return 1;
-    }
-    else
-    {
-
-        //numPackets = pcap_dispatch(sessionHandle, 1, packetHandler, NULL);
-
-        //pcap_loop is an infinite loop currently...It is not seeing the injected ICMP packet currently...
-        //Test "injecting" a packet on the above device name.
-        //numPackets = pcap_dispatch(sessionHandle, 1, packetHandler, NULL);
-        //pcap_inject returns num of bytes written or -1 on failure.
-
-        cout << "Searching for the ICMP response..." << endl;
-        if (pcap_loop(listenHandle, 0, packetHandler, (u_char*)listenHandle) == -1)
-        {
-            cout << "Error capturing packets..." << endl;
-            cout << "Closing the listening handle and exiting..." << endl;
-            pcap_close(listenHandle);
-            return 1;
-        }
-    }
-
-    */
-
     char input;
+    int mySocketFlag;
+
+    mySocketFlag = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+
+    if ( mySocketFlag < 0 )
+    {
+        cout << "Error: Socket creation failed..." << endl;
+        //successFlag = 0;
+    }
+
     do
     {
         printMenu();
         input = getUserChoice();
-        processUserChoice(input);
+        processUserChoice(mySocketFlag, input);
     }
     while (input != 'q' && input != 'Q');
 
-    //cout << "Closing the session handle..." << endl;
     cout << "Goodbye!" << endl;
-    //pcap_close(listenHandle);
-    //pcap_close(sessionHandle);
+
+    //Close the socket
+    close(mySocketFlag);
+
     return 0;
 }
 //****************************************************************************************
+
+/*
+----------MENU----------
+A....Inject an ICMP packet onto the network using pcap.
+R....Inject an ICMP packet onto the network using a raw socket.
+Q....Quit and close any remaining open sessions.
+
+Please input the letter of your selection from the menu: A
+Finding a valid interface for injection...
+Found device named: enp34s0
+Opening the device for injection...
+Injecting the ICMP Packet...
+Closing the session handle...
+
+----------MENU----------
+A....Inject an ICMP packet onto the network using pcap.
+R....Inject an ICMP packet onto the network using a raw socket.
+Q....Quit and close any remaining open sessions.
+
+Please input the letter of your selection from the menu: R
+Binding socket...
+Socket binded successfully!
+ICMP Packet sent successfully!
+Getting the response...
+^X^C
+*/
+
+
+
