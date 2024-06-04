@@ -22,11 +22,8 @@ char hostList[MAX_HOSTS][16]; //Assuming each IP addr is stored in a 16-characte
 
 void displayHostList()
 {
-    // cout << "Host List:" << endl;
-    // for (const auto& host : hostList)
-    // {
-    //     cout << host << endl;
-    // }
+    cout << "Printing the host list..." << endl;
+
     for(int i = 0; i < MAX_HOSTS; i ++ )
     {
         cout << "Host " << i + 1 << ": ";
@@ -36,6 +33,8 @@ void displayHostList()
         }
         cout << endl;
     }
+    cout << "\n*****************************************" << endl;
+    cout << "\nDone." << endl;
 }
 
 //****************************************************************************************
