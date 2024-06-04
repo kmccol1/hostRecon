@@ -1,7 +1,14 @@
+//****************************************************************************************
+//
+//    Filename: networkScanner.cpp
+//    Author:   Kyle McColgan
+//    Date:     4 June 2024
+//
+//****************************************************************************************
+
 #include <iostream>
 #include <pcap/pcap.h>
 #include <netinet/ip.h>
-#include <string>
 #include <cstring>
 using namespace std;
 
@@ -105,7 +112,6 @@ void capturePackets()
         nextSlot++;
     }
 
-    //Capture a single packet
     cout << "\n***Capturing..." << endl;
     //while (true)
     //while(totalPackets < numPackets)
@@ -168,7 +174,32 @@ sudo ./networkScanner
 ***Opening session...
 
 ***Capturing...
-total packets: 1
-Source IP: 192.168.1.208
-Destination IP: 192.168.1.255
+Copying...
+Before source: 142.32.34.241
+Copied source: 142.32.34.241
+Captured source info: 142.32.34.241
+Copying...
+Before source: 156.82.220.244
+Copied source: 156.82.220.244
+Captured source info: 156.82.220.244
+Copying...
+Before source: 29.15.1.10
+Copied source: 29.15.1.10
+Captured source info: 29.15.1.10
+Copying...
+Before source: 142.32.34.241
+Copied source: 142.32.34.241
+Captured source info: 142.32.34.241
+Copying...
+Before source: 192.168.1.235
+Copied source: 192.168.1.235
+Captured source info: 192.168.1.235
+Copying...
+Before source: 156.82.220.244
+Copied source: 156.82.220.244
+Captured source info: 156.82.220.244
+Copying...
+Before source: 192.168.1.235
+Copied source: 192.168.1.235
+Captured source info: 192.168.1.235
 */
