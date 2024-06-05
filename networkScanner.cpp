@@ -10,6 +10,7 @@
 #include <pcap/pcap.h>
 #include <netinet/ip.h>
 #include <cstring>
+#include <arpa/inet.h>
 using namespace std;
 
 //****************************************************************************************
@@ -136,6 +137,14 @@ void capturePackets()
         //hostList.insert(ipAddr);
         //strcpy(hostList[nextIndex], source);
 
+        //Define a buffer to store the converted IP addr...
+        char ipStr[INET_ADDRSTRLEN];
+
+        //Convert the source IP from ASCII to dotted-decimal format...
+        inet_ntop(AF_INET, source, ipStr, INET_ADDRSTRLEN);
+
+        //Update the hostList char array.
+
         if(nextSlot < MAX_HOSTS)
         {
             // for(int i = 0; i < 16 && source[i] != '\0'; i++)
@@ -143,7 +152,8 @@ void capturePackets()
             //     hostList[nextSlot][i] = source[i];
             // }
             // hostList[nextSlot][15] = '\0'; //Null-terminate the string...
-            strcpy(hostList[nextSlot], source);
+            strcpy(hostList[nextSlot], ipStr);
+            nextSlot++; //Increment the nextSlot for the next update...
         }
         else
         {
@@ -169,6 +179,7 @@ int main()
 /*
 g++ networkScanner.cpp -lpcap -o networkScanner
 sudo ./networkScanner
+[sudo] password for root:
 
 ***Opening session...
 
@@ -178,27 +189,44 @@ Before source: 142.32.34.241
 Copied source: 142.32.34.241
 Captured source info: 142.32.34.241
 Copying...
-Before source: 156.82.220.244
-Copied source: 156.82.220.244
-Captured source info: 156.82.220.244
+Before source: 34.241.192.168
+Copied source: 34.241.192.168
+Captured source info: 34.241.192.168
 Copying...
-Before source: 29.15.1.10
-Copied source: 29.15.1.10
-Captured source info: 29.15.1.10
+Before source: 182.116.111.98
+Copied source: 182.116.111.98
+Captured source info: 182.116.111.98
 Copying...
-Before source: 142.32.34.241
-Copied source: 142.32.34.241
-Captured source info: 142.32.34.241
+Before source: 192.168.1.208
+Copied source: 192.168.1.208
+Captured source info: 192.168.1.208
 Copying...
-Before source: 192.168.1.235
-Copied source: 192.168.1.235
-Captured source info: 192.168.1.235
+Before source: 192.168.1.208
+Copied source: 192.168.1.208
+Captured source info: 192.168.1.208
 Copying...
-Before source: 156.82.220.244
-Copied source: 156.82.220.244
-Captured source info: 156.82.220.244
+Before source: 192.168.1.254
+Copied source: 192.168.1.254
+Captured source info: 192.168.1.254
 Copying...
-Before source: 192.168.1.235
-Copied source: 192.168.1.235
-Captured source info: 192.168.1.235
+Before source: 192.168.1.254
+Copied source: 192.168.1.254
+Captured source info: 192.168.1.254
+Copying...
+Before source: 167.208.92.32
+Copied source: 167.208.92.32
+Captured source info: 167.208.92.32
+Copying...
+Before source: 167.208.92.32
+Copied source: 167.208.92.32
+Captured source info: 167.208.92.32
+Copying...
+Before source: 167.208.92.32
+Copied source: 167.208.92.32
+Captured source info: 167.208.92.32
+Copying...
+Before source: 167.208.92.32
+Copied source: 167.208.92.32
+Captured source info: 167.208.92.32
+Host list is full. Cannot add more hosts.
 */
