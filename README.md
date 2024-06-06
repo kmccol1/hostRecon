@@ -7,7 +7,7 @@ and troubleshoot potential issues effectively.
 
 **Current State:**
 The current state of the project successfully captures and analyzes IPv4 network packets.
-However, we have identified an issue with some entries in the hostList, resulting in odd non-ASCII Unicode characters getting displayed to the user. We are actively investigating the conversion process for storing IP addresses to ensure proper formatting in the 'hostList' char array. By reviewing and refining this process, we aim to resolve this issue expeditiously and therefore improve the overall functionality and user-friendliness of the application.
+However, we have identified an issue with some entries in the hostList, resulting in special Unicode characters in the program output. We are actively investigating the conversion process for storing IP addresses to ensure proper formatting in the 'hostList' char array. By reviewing and refining this process, we aim to resolve this issue expeditiously and therefore improve the overall functionality and user-friendliness of the application.
 
 **Future State:**
 In the future, enhancing the error handling mechanisms within the app can help in identifying and resolving issues more effectively.
