@@ -11,19 +11,27 @@
 #include <netinet/ip.h>
 #include <cstring>
 #include <arpa/inet.h>
-#include <regex>
 using namespace std;
 
 //****************************************************************************************
 
-const int MAX_HOSTS=50;
+const int MAX_HOSTS=5;
 pcap_t * session;
 
 //****************************************************************************************
 
 void copyAddr(char (*hostList)[16], const char * source, int index)
 {
-    strncpy(hostList[index], source, 16);
+    int adrLen = strlen(source);
+    cout << "Copying " << adrLen << " chars..." << endl;
+    strncpy(hostList[index], source, adrLen);
+    hostList[index][adrLen] = '\0';
+    cout << "\nhostList updated." << endl;
+    //cout << "Copied " << adrLen << "chars..." << endl;
+    // if(strlen(source) == 16)
+    // {
+    //     hostList[index][15] = '\0';
+    // }
 }
 
 //****************************************************************************************
@@ -47,8 +55,6 @@ void filterSpecialChars(const char * address, char * filtered)
 
 bool isValidIPAddress(const char* address)
 {
-    // regex pattern("^((25[0-5]|2[0-4][0-9][01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9][01]?[0-9][0-9]?)$");
-    // return regex_match(address, pattern);
     int numDots = 0;
     int numDigits = 0;
     bool result = true;
@@ -133,34 +139,22 @@ bool inList(const char* address, char (*hostList)[16], int listSize)
 
 //****************************************************************************************
 
-void displayHostList(char (*hostList)[16], int maxLength)
+void displayHostList(char (*hostList)[16], int numHosts)
 {
-    cout << "Printing the host list..." << endl;
+    cout << "\n\nPrinting list with " << numHosts << " hosts included." << endl;
+    cout << "*****************************************" << endl;
 
-    // for(int i = 0; i < maxLength; i ++ )
-    // {
-    //     if(hostList[i][0] != '\0')
-    //     {
-    //         cout << "Host " << i+1 << ": " << hostList[i] << endl;
-    //     }
-    // }
-
-    for (int i = 0; i < MAX_HOSTS; i ++)
+    for (int i = 0; i < numHosts; i ++)
     {
-        cout << "Host " << i + 1 << ": ";
-        for (int j = 0; j < 16; j ++)
-        {
-            if(hostList[i][j] != '\0')
-            {
-                cout << hostList[i][j];
-            }
-            else
-            {
-                break;
-            }
-
-        }
-        cout << endl;
+        // for (int i = 0; i < 16; ++ i)
+        // {
+        //if(hostList[i][0] != '\0')
+        //{
+        cout << "Host " << i+1 << ": " << hostList[i] << endl;
+        //}
+        // }
+        // cout << endl;
+        //cout << "Host " << i+1 << ": " << hostList[i] << endl;
     }
     cout << "\n*****************************************" << endl;
     cout << "\nDone." << endl;
@@ -222,37 +216,32 @@ void extractDeviceInfo(const u_char * packet, char (&source)[16], char(&destinat
 
 //****************************************************************************************
 
-void capturePackets(char (*hostList)[16], int maxLength)
+void capturePackets(char (*hostList)[16], int maxLength, int & numHosts)
 {
-    int totalPackets = 0;
+    int totalPackets;
     struct pcap_pkthdr header;
     const u_char * packet;
-    int totalHosts = 20;
+    //int totalHosts = 20;
     char source[16];
     char destination[16];
     int hostListSize = sizeof(hostList) / sizeof(hostList[0]);
     int nextSlot = 0;
     char ipStr[INET_ADDRSTRLEN]; //Define a buffer to store the converted IP addr...
-    char cleaned[100];
-    int cleanedIndex = 0;
-    int hostIndex = 0;
-    int addressIndex = 0;
-    int charIndex;
-    int j = 0;
     char filteredIP[16];
-
 
     while ( (hostList[nextSlot][0] != '\0') && (nextSlot < MAX_HOSTS))
     {
+        numHosts = nextSlot;
         nextSlot++;
     }
 
     cout << "\n***Capturing packets..." << endl;
     //while (true)
     //while(totalPackets < numPackets)
-    while(hostListSize < totalHosts)
+    //while(hostListSize < totalHosts)
+    while(nextSlot < MAX_HOSTS)
     {
-        cleanedIndex = 0;
+        cout << "\n*****************************************" << endl;
         packet = pcap_next(session, &header);
         if(packet == NULL)
         {
@@ -262,129 +251,46 @@ void capturePackets(char (*hostList)[16], int maxLength)
         //cout << "\ntotal packets: " << totalPackets << endl;
 
         extractDeviceInfo(packet, source, destination);
-        //cout << "Captured source info: " << source << endl;
+        cout << "\nCaptured source info: " << source
+             << "..." << strlen(source) << " chars." << endl;
 
         //Convert the source IP from ASCII to dotted-decimal format...
-        inet_ntop(AF_INET, source, ipStr, INET_ADDRSTRLEN);
+        // inet_ntop(AF_INET, source, ipStr, INET_ADDRSTRLEN);
+        // cout << "Converted source info: " << source
+        //      << "..." << strlen(ipStr) << " chars." << endl;
 
         //Update the hostList char array...
 
         //if((isValidIPAddress(ipStr)) && (nextSlot < MAX_HOSTS))
-        if((nextSlot < MAX_HOSTS) && (isValidIPAddress(ipStr) == true) && (!inList(ipStr, hostList, nextSlot)))
+        if((nextSlot < MAX_HOSTS) && (isValidIPAddress(source) == true) && (!inList(source, hostList, nextSlot)))
+        //if((nextSlot < MAX_HOSTS))
         {
-            cout << "Updating list with: " << ipStr << endl;
+            // cout << "Updating list with: " << ipStr << endl;
+            // filterSpecialChars(ipStr, filteredIP);
 
+            //cout << "\nBefore Copy: " << hostList[nextSlot] << endl; spec. chars...
+            copyAddr(hostList, source, nextSlot);
+            cout << "\nAfter copy: " << hostList[nextSlot] << endl;
 
-            //Poor man's str(n)cpy...
-            // while(ipStr[addressIndex] != '\0' && nextSlot < MAX_HOSTS)
-            // {
-            //     charIndex = 0;
-            //     while(ipStr[addressIndex] != '\0' && ipStr[addressIndex] != '.' && charIndex < 15)
-            //     {
-            //         hostList[nextSlot][charIndex] = ipStr[addressIndex];
-            //         addressIndex ++;
-            //         charIndex ++;
-            //     }
-            //     hostList[nextSlot][charIndex] = '\0'; //Null-terminate the string...
-            //     //hostIndex ++;
-            //     addressIndex ++;
-            // }
-
-            // charIndex = 0;
-            // while(ipStr[charIndex] != '\0' && charIndex < 15)
-            // {
-            //     hostList[nextSlot][charIndex] = ipStr[charIndex];
-            //     charIndex ++;
-            // }
-            // hostList[nextSlot][charIndex] = '\0'; //Null-terminate the string...
-
-            // for(int i = 0, j=0; i < strlen(ipStr); i ++)
-            // {
-            //     if((ipStr[i] >= '0' && ipStr[i] <= '9') || ipStr[i] == '.')
-            //     {
-            //         hostList[nextSlot][j++] = ipStr[i];
-            //     }
-            //     else
-            //     {
-            //         cout << "Detected Unicode..." << endl;
-            //     }
-            // }
-            // hostList[nextSlot][j] = '\0';
-
-            // for(int i = 0; ipAddr[i] != '\0'; i ++)
-            // {
-            //     if(isdigit(ipAddr[i] || ipAddr[i] == '.')
-            //     {
-            //         hostList[nextSlot] = ipAddr[i];
-            //     }
-            // }
-
-            // int ipStrIndex = 0;
-            // int hostListIndex = 0;
-            //
-            // while(ipStr[ipStrIndex] != '\0' && hostListIndex < 15)
-            // {
-            //     if(isdigit(ipStr[ipStrIndex]) || ipStr[ipStrIndex] == '.')
-            //     {
-            //         hostList[nextSlot][hostListIndex] = ipStr[ipStrIndex];
-            //         hostListIndex ++;
-            //     }
-            //     ipStrIndex ++;
-            // }
-            // int index = 0;
-            // int ipIndex = 0;
-
-
-            // while(filteredIP[ipIndex] != '\0' && nextSlot < MAX_HOSTS)
-            // {
-            //     char currentChar = filteredIP[ipIndex];
-            //     if(isdigit(currentChar) || currentChar == '.')
-            //     {
-            //         hostList[nextSlot][0] = currentChar;
-            //         hostList[nextSlot][1] = '\0'';
-            //         index ++;
-            //     }
-            //     ipIndex ++;
-            // }
-            filterSpecialChars(ipStr, filteredIP);
-
-            // for(int i = 0; i < MAX_HOSTS; i ++)
-            // {
-            //     snprintf(hostList[i])
-            // }
-
-            //strncpy(hostList[nextSlot], filteredIP, 16);
-            //hostList[nextSlot][15] = '\0'; //Null-terminate the string...
-            //strncpy(hostList[nextSlot], filteredIP, 16);
-            cout << "Before Copy: " << hostList[nextSlot] << endl;
-            copyAddr(hostList, filteredIP, nextSlot);
-            cout << "After copy: " << hostList[nextSlot] << endl;
-            //strcpy(hostList[nextSlot], ipStr);
-
-            //strcpy(hostList[nextSlot], ipStr);
-            //hostList[nextSlot][15] = '\0'; //Null-terminate the string...
             nextSlot++; //Increment the nextSlot for the next update...
-            //cout << "Saved host entry: " << hostList[nextSlot] << endl;
-            //cout << "Filtered: " << filteredIP << endl;
-            //cout << "Copied/saved: ";// << hostList[nextSlot] << endl;
-            // cout.write(hostList[nextSlot], 16);
-            // cout << endl;
-
-
-            // for(int i = 0; i < 16 && hostList[nextSlot][i] != '\0'; ++ i)
-            // {
-            //     cout << hostList[nextSlot][i];
-            // }
-            // cout << endl;
-
-            hostListSize = sizeof(hostList) / sizeof(hostList[0]);
+            //hostListSize = sizeof(hostList) / sizeof(hostList[0]);
+            //displayHostList(hostList, numHosts);
+        }
+        else if(inList(source, hostList, nextSlot))
+        {
+            cout << "Duplicate entry found. Skipping..." << endl;
+            continue;
         }
         else
         {
             //Handle the case when the hostList is full...
             cout << "Host list is full. Cannot add more hosts." << endl;
+            //numHosts = nextSlot;
+            //numHosts = hostListSize;
+            //displayHostList(hostList, numHosts);
             break;
         }
+        //cout << "\n*****************************************" << endl;
     }
 }
 
@@ -392,11 +298,15 @@ void capturePackets(char (*hostList)[16], int maxLength)
 
 int main()
 {
+
     char hostList[MAX_HOSTS][16]; //Assuming each IP addr is stored in a 16-character array.
+    int numHosts;
+
     openNetworkInterface();
-    capturePackets(hostList, MAX_HOSTS);
+    capturePackets(hostList, MAX_HOSTS, numHosts);
     //Further processing and analysis...
-    //displayHostList(hostList, MAX_HOSTS);
+    displayHostList(hostList, numHosts);
+    pcap_close(session);
     return 0;
 }
 
