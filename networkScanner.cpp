@@ -230,9 +230,9 @@ void capturePackets(char (*hostList)[16], int maxLength, int & numHosts)
     char ipStr[INET_ADDRSTRLEN]; //Define a buffer to store the converted IP addr...
     char filteredIP[16];
 
-    while ( (hostList[nextSlot][0] != '\0') && (nextSlot < MAX_HOSTS))
+    while ( (hostList[nextSlot][0] != '\0') && (numEntries < MAX_HOSTS))
     {
-        numHosts = nextSlot;
+        //numHosts = nextSlot;
         nextSlot++;
     }
 
@@ -240,7 +240,7 @@ void capturePackets(char (*hostList)[16], int maxLength, int & numHosts)
     //while (true)
     //while(totalPackets < numPackets)
     //while(hostListSize < totalHosts)
-    while(numEntries < MAX_HOSTS)
+    while(/*(hostList[numEntries][0] != '\0') && */ numEntries < MAX_HOSTS)
     {
         cout << "\n*****************************************" << endl;
         packet = pcap_next(session, &header);
@@ -300,7 +300,7 @@ int main()
 {
 
     char hostList[MAX_HOSTS][16]; //Assuming each IP addr is stored in a 16-character array.
-    int numHosts;
+    int numHosts = 0;
 
     openNetworkInterface();
     capturePackets(hostList, MAX_HOSTS, numHosts);
@@ -315,6 +315,7 @@ int main()
 /*
 g++ networkScanner.cpp -lpcap -o networkScanner
 hostRecon> sudo ./networkScanner
+[sudo] password for root:
 
 ***Opening session...
 
@@ -322,21 +323,21 @@ hostRecon> sudo ./networkScanner
 
 *****************************************
 
+Captured source info: 211.122.206.83...14 chars.
+Copying 14 chars to list at index: 0
+
+hostList updated.
+
+After copy: 211.122.206.83
+
+*****************************************
+
 Captured source info: 142.32.34.241...13 chars.
-Copying 13 chars to list at index: 0
+Copying 13 chars to list at index: 1
 
 hostList updated.
 
 After copy: 142.32.34.241
-
-*****************************************
-
-Captured source info: 190.237.54.106...14 chars.
-Copying 14 chars to list at index: 1
-
-hostList updated.
-
-After copy: 190.237.54.106
 
 *****************************************
 
@@ -349,32 +350,12 @@ After copy: 167.208.92.32
 
 *****************************************
 
-Captured source info: 0.1.5.16...8 chars.
-Copying 8 chars to list at index: 3
+Captured source info: 64.2.12.27...10 chars.
+Copying 10 chars to list at index: 3
 
 hostList updated.
 
-After copy: 0.1.5.16
-
-*****************************************
-
-Captured source info: 0.1.5.16...8 chars.
-Duplicate entry found. Skipping...
-
-*****************************************
-
-Captured source info: 167.208.92.32...13 chars.
-Duplicate entry found. Skipping...
-
-*****************************************
-
-Captured source info: 142.32.34.241...13 chars.
-Duplicate entry found. Skipping...
-
-*****************************************
-
-Captured source info: 190.237.54.106...14 chars.
-Duplicate entry found. Skipping...
+After copy: 64.2.12.27
 
 *****************************************
 
@@ -386,15 +367,13 @@ hostList updated.
 After copy: 29.15.1.10
 
 
-Printing list with 7 hosts included.
+Printing list with 5 hosts included.
 *****************************************
-Host 1: 142.32.34.241
-Host 2: 190.237.54.106
+Host 1: 211.122.206.83
+Host 2: 142.32.34.241
 Host 3: 167.208.92.32
-Host 4: 0.1.5.16
+Host 4: 64.2.12.27
 Host 5: 29.15.1.10
-Host 6:
-Host 7: glibcxx.P@
 
 *****************************************
 
