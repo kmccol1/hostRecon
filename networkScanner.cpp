@@ -15,7 +15,7 @@ using namespace std;
 
 //****************************************************************************************
 
-const int MAX_HOSTS=5;
+const int MAX_HOSTS=10;
 pcap_t * session;
 
 //****************************************************************************************
@@ -27,11 +27,6 @@ void copyAddr(char (*hostList)[16], const char * source, int index)
     strncpy(hostList[index], source, adrLen);
     hostList[index][adrLen] = '\0';
     cout << "\nhostList updated." << endl;
-    //cout << "Copied " << adrLen << "chars..." << endl;
-    // if(strlen(source) == 16)
-    // {
-    //     hostList[index][15] = '\0';
-    // }
 }
 
 //****************************************************************************************
@@ -66,24 +61,6 @@ bool isValidIPAddress(const char* address)
 
     while (*address)
     {
-        // if(*address == '.')
-        // {
-        //     if( (num < 0 ) || (num > 255))
-        //     {
-        //         result = false;
-        //     }
-        //     num=0;
-        //     dots ++;
-        // }
-        // else if(*address >= '0' && *address <= '9')
-        // {
-        //     num = num * 10 + (*address - '0');
-        // }
-        // else
-        // {
-        //     result = false; //Return false if a non-numeric character is found.
-        // }
-
         if(*address == '.')
         {
             numDots ++;
@@ -198,21 +175,6 @@ void extractDeviceInfo(const u_char * packet, char (&source)[16], char(&destinat
     //cout << "Before source: " << sourceIP << endl;
     strncpy(source, sourceIP, sizeof(source));
     strncpy(destination, destinationIP, sizeof(destination));
-
-    // source[sizeof(source)] = '\0';
-    // destination[sizeof(destination)] = '\0';
-    // for(int i = 0; i < 16; i++)
-    // {
-    //     source[i] = sourceIP[i];
-    // }
-    // source[15] = '\0'; //Add null terminator to ensure string termination...
-    //
-    // for(int i = 0; i < 16; i++)
-    // {
-    //     destination[i] = destinationIP[i];
-    // }
-    // destination[15] = '\0'; //Add null terminator to ensure string termination...
-    //cout << "Copied source: " << source << endl;
 }
 
 //****************************************************************************************
