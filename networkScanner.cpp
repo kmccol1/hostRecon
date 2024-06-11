@@ -23,7 +23,7 @@ pcap_t * session;
 void copyAddr(char (*hostList)[16], const char * source, int index)
 {
     int adrLen = strlen(source);
-    cout << "Copying " << adrLen << " chars..." << endl;
+    cout << "Copying " << adrLen << " chars to list at index: " << index << endl;
     strncpy(hostList[index], source, adrLen);
     hostList[index][adrLen] = '\0';
     cout << "\nhostList updated." << endl;
@@ -146,14 +146,14 @@ void displayHostList(char (*hostList)[16], int numHosts)
 
     for (int i = 0; i < numHosts; i ++)
     {
-        // for (int i = 0; i < 16; ++ i)
-        // {
+        //for (int i = 0; i < 16; ++ i)
+        //{
         //if(hostList[i][0] != '\0')
         //{
         cout << "Host " << i+1 << ": " << hostList[i] << endl;
         //}
-        // }
-        // cout << endl;
+        //}
+        //cout << endl;
         //cout << "Host " << i+1 << ": " << hostList[i] << endl;
     }
     cout << "\n*****************************************" << endl;
@@ -196,10 +196,11 @@ void extractDeviceInfo(const u_char * packet, char (&source)[16], char(&destinat
 
     //cout << "Copying..." << endl;
     //cout << "Before source: " << sourceIP << endl;
-    strncpy(source, sourceIP, sizeof(source) - 1);
-    strncpy(destination, destinationIP, sizeof(destination) - 1);
+    strncpy(source, sourceIP, sizeof(source));
+    strncpy(destination, destinationIP, sizeof(destination));
 
-
+    // source[sizeof(source)] = '\0';
+    // destination[sizeof(destination)] = '\0';
     // for(int i = 0; i < 16; i++)
     // {
     //     source[i] = sourceIP[i];
@@ -221,7 +222,7 @@ void capturePackets(char (*hostList)[16], int maxLength, int & numHosts)
     int totalPackets;
     struct pcap_pkthdr header;
     const u_char * packet;
-    //int totalHosts = 20;
+    int numEntries = 0;
     char source[16];
     char destination[16];
     int hostListSize = sizeof(hostList) / sizeof(hostList[0]);
@@ -239,7 +240,7 @@ void capturePackets(char (*hostList)[16], int maxLength, int & numHosts)
     //while (true)
     //while(totalPackets < numPackets)
     //while(hostListSize < totalHosts)
-    while(nextSlot < MAX_HOSTS)
+    while(numEntries < MAX_HOSTS)
     {
         cout << "\n*****************************************" << endl;
         packet = pcap_next(session, &header);
@@ -262,19 +263,19 @@ void capturePackets(char (*hostList)[16], int maxLength, int & numHosts)
         //Update the hostList char array...
 
         //if((isValidIPAddress(ipStr)) && (nextSlot < MAX_HOSTS))
-        if((nextSlot < MAX_HOSTS) && (isValidIPAddress(source) == true) && (!inList(source, hostList, nextSlot)))
+        if((numEntries < MAX_HOSTS) && (isValidIPAddress(source) == true) && (!inList(source, hostList, nextSlot)))
         //if((nextSlot < MAX_HOSTS))
         {
             // cout << "Updating list with: " << ipStr << endl;
             // filterSpecialChars(ipStr, filteredIP);
 
             //cout << "\nBefore Copy: " << hostList[nextSlot] << endl; spec. chars...
-            copyAddr(hostList, source, nextSlot);
-            cout << "\nAfter copy: " << hostList[nextSlot] << endl;
+            copyAddr(hostList, source, numEntries); //numHosts or nextSlot...???
+            cout << "\nAfter copy: " << hostList[numEntries] << endl;
 
             nextSlot++; //Increment the nextSlot for the next update...
-            //hostListSize = sizeof(hostList) / sizeof(hostList[0]);
-            //displayHostList(hostList, numHosts);
+            numHosts++;
+            numEntries++;
         }
         else if(inList(source, hostList, nextSlot))
         {
@@ -290,7 +291,6 @@ void capturePackets(char (*hostList)[16], int maxLength, int & numHosts)
             //displayHostList(hostList, numHosts);
             break;
         }
-        //cout << "\n*****************************************" << endl;
     }
 }
 
@@ -314,16 +314,87 @@ int main()
 
 /*
 g++ networkScanner.cpp -lpcap -o networkScanner
-sudo ./networkScanner
+hostRecon> sudo ./networkScanner
 
 ***Opening session...
 
-***Capturing...
-Host list is full. Cannot add more hosts.
-Printing the host list...
-Host 3: 49.52.50.46
-Host 4: 55.54.46.49
-Host 5: 50.57.46.49
+***Capturing packets...
+
+*****************************************
+
+Captured source info: 142.32.34.241...13 chars.
+Copying 13 chars to list at index: 0
+
+hostList updated.
+
+After copy: 142.32.34.241
+
+*****************************************
+
+Captured source info: 190.237.54.106...14 chars.
+Copying 14 chars to list at index: 1
+
+hostList updated.
+
+After copy: 190.237.54.106
+
+*****************************************
+
+Captured source info: 167.208.92.32...13 chars.
+Copying 13 chars to list at index: 2
+
+hostList updated.
+
+After copy: 167.208.92.32
+
+*****************************************
+
+Captured source info: 0.1.5.16...8 chars.
+Copying 8 chars to list at index: 3
+
+hostList updated.
+
+After copy: 0.1.5.16
+
+*****************************************
+
+Captured source info: 0.1.5.16...8 chars.
+Duplicate entry found. Skipping...
+
+*****************************************
+
+Captured source info: 167.208.92.32...13 chars.
+Duplicate entry found. Skipping...
+
+*****************************************
+
+Captured source info: 142.32.34.241...13 chars.
+Duplicate entry found. Skipping...
+
+*****************************************
+
+Captured source info: 190.237.54.106...14 chars.
+Duplicate entry found. Skipping...
+
+*****************************************
+
+Captured source info: 29.15.1.10...10 chars.
+Copying 10 chars to list at index: 4
+
+hostList updated.
+
+After copy: 29.15.1.10
+
+
+Printing list with 7 hosts included.
+*****************************************
+Host 1: 142.32.34.241
+Host 2: 190.237.54.106
+Host 3: 167.208.92.32
+Host 4: 0.1.5.16
+Host 5: 29.15.1.10
+Host 6:
+Host 7: glibcxx.P@
 
 *****************************************
 
