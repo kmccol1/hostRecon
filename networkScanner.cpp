@@ -3,6 +3,7 @@
 //    Filename: networkScanner.cpp
 //    Author:   Kyle McColgan
 //    Date:     4 June 2024
+//    Description: CLI based networking utility for preliminary network reconnaissance.
 //
 //****************************************************************************************
 
@@ -18,7 +19,7 @@ using namespace std;
 
 //****************************************************************************************
 
-const int MAX_HOSTS=10;
+const int MAX_HOSTS = 254; //Covers a typical /24 subnet, w/ 254 usable hosts.
 pcap_t * session;
 
 //****************************************************************************************
@@ -147,7 +148,20 @@ bool pingSweep( char (&destination)[16])
 
         if(icmp -> type == ICMP_ECHOREPLY)
         {
+            cout << "Received ICMP Echo Reply from: " << destination << endl;
             result = true;
+        }
+        else if(icmp -> type == ICMP_DEST_UNREACH)
+        {
+            cout << "Received ICMP Dest Unreachable from: " << destination << endl;
+        }
+        else if(icmp -> type == ICMP_TIME_EXCEEDED)
+        {
+            cout << "Received ICMP Time Exceeded from: " << destination << endl;
+        }
+        else
+        {
+            cout << "Received ICMP type: " << (int)icmp->type << endl;
         }
     }
 
@@ -358,21 +372,6 @@ void extractDeviceInfo(const u_char * packet, char (&source)[16], char(&destinat
     //cout << "Before source: " << sourceIP << endl;
     strncpy(source, sourceIP, sizeof(source));
     strncpy(destination, destinationIP, sizeof(destination));
-
-    // source[sizeof(source)] = '\0';
-    // destination[sizeof(destination)] = '\0';
-    // for(int i = 0; i < 16; i++)
-    // {
-    //     source[i] = sourceIP[i];
-    // }
-    // source[15] = '\0'; //Add null terminator to ensure string termination...
-    //
-    // for(int i = 0; i < 16; i++)
-    // {
-    //     destination[i] = destinationIP[i];
-    // }
-    // destination[15] = '\0'; //Add null terminator to ensure string termination...
-    //cout << "Copied source: " << source << endl;
 }
 
 //****************************************************************************************
@@ -398,10 +397,7 @@ void capturePackets(char (*hostList)[16], int maxLength, int & numHosts)
 
 //     cout << "\n***Capturing packets..." << endl;
 //
-//     while(1)
-//     {
-//
-//     }
+
     //while (true)
     //while(totalPackets < numPackets)
     //while(hostListSize < totalHosts)
@@ -468,9 +464,7 @@ int main()
     int numHosts = 0;
 
     openNetworkInterface();
-    //capturePackets(hostList, MAX_HOSTS, numHosts);
-    //Further processing and analysis...
-    //displayHostList(hostList, numHosts);
+
     getHosts(hostList, numHosts);
     displayHostList(hostList, numHosts);
     pcap_close(session);
