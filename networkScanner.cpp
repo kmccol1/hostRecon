@@ -2,7 +2,7 @@
 //
 //    Filename: networkScanner.cpp
 //    Author:   Kyle McColgan
-//    Date:     4 June 2024
+//    Date:     17 June 2024
 //    Description: CLI based networking utility for preliminary network reconnaissance.
 //
 //****************************************************************************************
@@ -11,10 +11,14 @@
 #include <pcap/pcap.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
+#include <netinet/ether.h>
 #include <cstring>
 #include <arpa/inet.h>
 #include <algorithm> //For std::reverse()
 #include <cstdlib>
+#include <thread>
+#include <chrono>
+#include <netinet/in.h> //For struct definitions
 using namespace std;
 
 //****************************************************************************************
@@ -24,9 +28,42 @@ pcap_t * session;
 
 //****************************************************************************************
 
-// bool isActive(const char * address)
+//Ethernet header structure
+// struct ethhdr
 // {
+//     unsigned char destMAC[6];
+//     unsigned char sourceMAC[6];
+//     unsigned short etherType;
+// }
 //
+// //****************************************************************************************
+//
+// //IP header structure
+// struct iphdr
+// {
+//     unsigned char ihl : 4;
+//     unsigned char version : 4;
+//     unsigned char tos;
+//     unsigned short totalLength;
+//     unsigned short idenfitication;
+//     unsigned short fragOff;
+//     unsigned char ttl;
+//     unsigned char protocol;
+//     unsigned short checksum;
+//     unsigned int sourceIP;
+//     unsigned int destIP;
+// }
+//
+// //****************************************************************************************
+//
+// //ICMP header structure
+// struct icmphdr
+// {
+//     unsigned char type;
+//     unsigned char code;
+//     unsigned short checksum;
+//     unsigned short identifier;
+//     unsigned short sequence;
 // }
 
 //****************************************************************************************
@@ -88,7 +125,7 @@ unsigned short computeChecksum(void * data, int length)
 
     sum = (sum >> 16) + (sum & 0xFFFF);
     sum += (sum >> 16);
-    result + ~sum;
+    result = ~sum;
 
     return result;
 }
@@ -103,14 +140,45 @@ bool pingSweep( char (&destination)[16])
     unsigned char myPacket[sizeof(struct ip) + sizeof(struct icmphdr)];
     const u_char * capPacket;
     struct pcap_pkthdr header;
+    pcap_t * captureSession;
+    pcap_t * sendSession;
+    bool responseCaptured = false;
+    int timeout = 1000; //Timeout value in milliseconds.
+
+    //Open sendSession
+    char errorMsg [PCAP_ERRBUF_SIZE];
+    //cout << "\n***Opening session..." << endl;
+    sendSession = pcap_open_live("enp34s0", BUFSIZ, 1, 1000, errorMsg);
+
+    if(sendSession == NULL)
+    {
+        cout << "Error opening the NIC for injection: " << errorMsg << endl;
+    }
+
+    //char errorMsg [PCAP_ERRBUF_SIZE];
+    //cout << "\n***Opening session..." << endl;
+    captureSession = pcap_open_live("enp34s0", BUFSIZ, 1, 1000, errorMsg);
+
+    if(captureSession == NULL)
+    {
+        cout << "Error opening the NIC for capture: " << errorMsg << endl;
+    }
+
+    // //Set the filter for ICMP packets
+    // struct bpf_program filter;
+    // bpf_u_int32 net;
+    // char filterExp[] = "icmp[icmptype] == icmp-echoreply";
+    // pcap_compile(captureSession, &filter, filterExp, 0, net);
+    // pcap_setfilter(captureSession, &filter);
 
     //Fill in the headers for the echo request...
 
     //Fill in the IP header...
+    memset(&ipHdr, 0, sizeof(ipHdr));
     ipHdr.ip_hl = 5; //Header length.
     ipHdr.ip_v = 4; //IP version.
     ipHdr.ip_tos = 0; //Type of service
-    ipHdr.ip_len = sizeof(struct ip) + sizeof(struct icmphdr); //Total length
+    ipHdr.ip_len = htons(sizeof(struct ip)) + sizeof(struct icmphdr); //Total length
     ipHdr.ip_id = htons(54321); //Identification.
     ipHdr.ip_off = 0; //Fragment Offset.
     ipHdr.ip_ttl = 255; //Time to live.
@@ -119,52 +187,139 @@ bool pingSweep( char (&destination)[16])
     ipHdr.ip_src.s_addr = inet_addr("192.168.1.213");
     ipHdr.ip_dst.s_addr = inet_addr(destination);
 
+    //Calculate the checksum for the IP header...
+    ipHdr.ip_sum = computeChecksum((unsigned short *)&ipHdr, sizeof(struct ip));
+
     //Fill in the ICMP header...
+    memset(&msgHdr, 0, sizeof(msgHdr));
     msgHdr.type = ICMP_ECHO; //ICMP Echo request type.
     msgHdr.code = 0; //Code
     msgHdr.checksum = 0; //Checksum (set to 0 before calculating.)
-    msgHdr.un.echo.id = 0; //Identifier.
-    msgHdr.un.echo.sequence = 0; //Sequence number.
+    msgHdr.un.echo.id = htons(1234); //Identifier.
+    msgHdr.un.echo.sequence = htons(1); //Sequence number.
 
     //Calculate the checksum for the ICMP header...
-    msgHdr.checksum = computeChecksum(&msgHdr, sizeof(msgHdr));
+    msgHdr.checksum = computeChecksum((unsigned short *)&msgHdr, sizeof(struct icmphdr));
 
-    //Prepare the packet for sending...
+    //Combine headers into one packet...
     memcpy(myPacket, &ipHdr, sizeof(struct ip));
     memcpy(myPacket + sizeof(struct ip), &msgHdr, sizeof(struct icmphdr));
 
     //send the packet using pcap_inject...
-    if(pcap_inject(session, &myPacket, sizeof(myPacket)) == -1)
+    cout << "\n***Pinging " << destination << "..." << endl;
+    if(pcap_inject(sendSession, &myPacket, sizeof(myPacket)) == -1)
     {
-        cout << "Error sending packet: " << pcap_geterr(session) << endl;
+        cout << "Error sending the packet: " << pcap_geterr(sendSession) << endl;
         result = false;
     }
-    else
+
+    //this_thread::sleep_for(chrono::seconds(1));
+
+    //Capture the response packet using pcap_next()...
+
+    while(!responseCaptured)
     {
-        cout << "Pinging " << destination << endl;
+        // if(pcap_inject(sendSession, &myPacket, sizeof(myPacket)) == -1)
+        // {
+        //     cout << "Error sending the packet: " << pcap_geterr(sendSession) << endl;
+        //     result = false;
+        // }
+        //else
+        //{
+        if(pcap_set_timeout(captureSession, timeout) == -1)
+        {
+            cout << "Error setting the time out variable: " << pcap_geterr(captureSession) << endl;
+        }
+        capPacket = pcap_next(captureSession, &header);
+        //}
 
-        capPacket = pcap_next(session, &header);
-        struct icmphdr * icmp = (struct icmphdr *)(capPacket + sizeof(struct iphdr));
+        if (capPacket == nullptr)
+        {
+            cout << "No packet captured." << endl;
+            continue;
+        }
 
-        if(icmp -> type == ICMP_ECHOREPLY)
+        struct ip * ipHeader = (struct ip *)(capPacket + 14); //Skip Ethernet header...
+        if(ipHeader->ip_p == IPPROTO_ICMP)
         {
-            cout << "Received ICMP Echo Reply from: " << destination << endl;
-            result = true;
-        }
-        else if(icmp -> type == ICMP_DEST_UNREACH)
-        {
-            cout << "Received ICMP Dest Unreachable from: " << destination << endl;
-        }
-        else if(icmp -> type == ICMP_TIME_EXCEEDED)
-        {
-            cout << "Received ICMP Time Exceeded from: " << destination << endl;
-        }
-        else
-        {
-            cout << "Received ICMP type: " << (int)icmp->type << endl;
+            struct icmphdr * icmpHeader = (struct icmphdr *)(capPacket + 14 + (ipHeader->ip_hl << 2)); //Skip IP header...
+
+            cout << "ICMP type: " << static_cast<int>(icmpHeader->type) << endl;
+
+            if(icmpHeader->type ==ICMP_ECHOREPLY)
+            {
+                cout <<"Received ICMP ECHO Reply packet..." << endl;
+                responseCaptured = true;
+                result = true;
+                break;
+            }
+            else if (icmpHeader->type ==ICMP_DEST_UNREACH)
+            {
+                cout <<"Received ICMP DEST UNREACH packet..." << endl;
+                responseCaptured = true;
+                result = false;
+                break;
+            }
+            else if (icmpHeader->type ==ICMP_TIME_EXCEEDED)
+            {
+                cout <<"Received ICMP TIME EXCEEDED packet..." << endl;
+                responseCaptured = true;
+                result = false;
+                break;
+            }
+            else
+            {
+                cout << "Unknown response type. Skipping..." << endl;
+                responseCaptured = true;
+                result = false;
+                break;
+            }
+            // cout << "ICMP type: " << static_cast<int>(icmpHeader->type) << endl;
         }
     }
 
+    //else
+    //{
+        //Check if it's an ICMP Echo Reply (type 0)
+        //struct ip * recvIPHdr = (struct ip *)(capPacket);
+        //const struct icmphdr * recvICMPHdr = (struct icmphdr *)(capPacket + sizeof(struct icmphdr) + sizeof(struct iphdr));
+
+
+        // const struct ethhdr * ethernetHeader;
+        // const struct iphdr * ipHeader;
+        // const struct icmphdr * icmpHeader;
+        //
+        // ethernetHeader = (ethhdr *)capPacket;
+        // ipHeader = (iphdr *)(capPacket + sizeof(ethhdr));
+        // icmpHeader = (icmphdr *)(capPacket + sizeof(ethhdr) + sizeof(iphdr));
+        //
+        // cout << "ICMP type: " << static_cast<int>(icmpHeader->type) << endl;
+
+        // if(ipHeader->protocol == IPPROTO_ICMP && icmpHeader->type == 0)
+        // {
+        //     cout << "Received ICMP Echo Reply from: " << destination << endl;
+        //     result = true;
+        // }
+        // // else if(recvICMPHdr -> type == ICMP_DEST_UNREACH)
+        // // {
+        // //     cout << "Received ICMP Dest Unreachable from: " << destination << endl;
+        // // }
+        // // else if(recvICMPHdr -> type == ICMP_TIME_EXCEEDED)
+        // // {
+        // //     cout << "Received ICMP Time Exceeded from: " << destination << endl;
+        // // }
+        // else if(ipHeader->protocol == IPPROTO_ICMP && icmpHeader->type == 8)
+        // {
+        //     cout << "\n***Received ICMP type 8!" << endl;
+        // }
+        // else
+        // {
+        //     cout << "Received ICMP type: " << (int)icmpHeader->type << endl;
+        // }
+    //}
+
+    pcap_close(captureSession);
+    pcap_close(sendSession);
     return result;
 }
 
@@ -202,6 +357,10 @@ void getHosts(char (*hostList)[16], int & numHosts)
                 cout << "Error: hostList is full, unable to add more hosts." << endl;
                 break;
             }
+        }
+        else
+        {
+            cout << "Inactive host detected. Skipping..." << endl;
         }
     }
 
@@ -463,8 +622,7 @@ int main()
     char hostList[MAX_HOSTS][16]; //Assuming each IP addr is stored in a 16-character array.
     int numHosts = 0;
 
-    openNetworkInterface();
-
+    //openNetworkInterface();
     getHosts(hostList, numHosts);
     displayHostList(hostList, numHosts);
     pcap_close(session);
@@ -476,306 +634,4 @@ int main()
 /*
 g++ networkScanner.cpp -lpcap -o networkScanner
 hostRecon> sudo ./networkScanner
-
-***Opening session...
-Pinging 192.168.1.1
-Pinging 192.168.1.2
-Pinging 192.168.1.3
-Pinging 192.168.1.4
-Pinging 192.168.1.5
-Copying 11 chars to list at index: 0
-
-hostList updated.
-
-After copy: 192.168.1.5
-Pinging 192.168.1.6
-Pinging 192.168.1.7
-Pinging 192.168.1.8
-Pinging 192.168.1.9
-Pinging 192.168.1.10
-Pinging 192.168.1.11
-Pinging 192.168.1.12
-Pinging 192.168.1.13
-Pinging 192.168.1.14
-Pinging 192.168.1.15
-Pinging 192.168.1.16
-Pinging 192.168.1.17
-Pinging 192.168.1.18
-Pinging 192.168.1.19
-Pinging 192.168.1.20
-Pinging 192.168.1.21
-Pinging 192.168.1.22
-Pinging 192.168.1.23
-Pinging 192.168.1.24
-Pinging 192.168.1.25
-Pinging 192.168.1.26
-Pinging 192.168.1.27
-Pinging 192.168.1.28
-Pinging 192.168.1.29
-Pinging 192.168.1.30
-Pinging 192.168.1.31
-Pinging 192.168.1.32
-Pinging 192.168.1.33
-Pinging 192.168.1.34
-Pinging 192.168.1.35
-Pinging 192.168.1.36
-Pinging 192.168.1.37
-Pinging 192.168.1.38
-Pinging 192.168.1.39
-Pinging 192.168.1.40
-Pinging 192.168.1.41
-Pinging 192.168.1.42
-Pinging 192.168.1.43
-Pinging 192.168.1.44
-Pinging 192.168.1.45
-Pinging 192.168.1.46
-Pinging 192.168.1.47
-Pinging 192.168.1.48
-Pinging 192.168.1.49
-Pinging 192.168.1.50
-Pinging 192.168.1.51
-Pinging 192.168.1.52
-Pinging 192.168.1.53
-Pinging 192.168.1.54
-Pinging 192.168.1.55
-Pinging 192.168.1.56
-Pinging 192.168.1.57
-Pinging 192.168.1.58
-Pinging 192.168.1.59
-Pinging 192.168.1.60
-Pinging 192.168.1.61
-Pinging 192.168.1.62
-Pinging 192.168.1.63
-Pinging 192.168.1.64
-Pinging 192.168.1.65
-Pinging 192.168.1.66
-Pinging 192.168.1.67
-Pinging 192.168.1.68
-Pinging 192.168.1.69
-Pinging 192.168.1.70
-Pinging 192.168.1.71
-Pinging 192.168.1.72
-Pinging 192.168.1.73
-Pinging 192.168.1.74
-Pinging 192.168.1.75
-Pinging 192.168.1.76
-Pinging 192.168.1.77
-Pinging 192.168.1.78
-Pinging 192.168.1.79
-Pinging 192.168.1.80
-Pinging 192.168.1.81
-Pinging 192.168.1.82
-Pinging 192.168.1.83
-Pinging 192.168.1.84
-Pinging 192.168.1.85
-Pinging 192.168.1.86
-Pinging 192.168.1.87
-Pinging 192.168.1.88
-Pinging 192.168.1.89
-Pinging 192.168.1.90
-Pinging 192.168.1.91
-Pinging 192.168.1.92
-Pinging 192.168.1.93
-Pinging 192.168.1.94
-Pinging 192.168.1.95
-Pinging 192.168.1.96
-Pinging 192.168.1.97
-Pinging 192.168.1.98
-Pinging 192.168.1.99
-Pinging 192.168.1.100
-Pinging 192.168.1.101
-Pinging 192.168.1.102
-Pinging 192.168.1.103
-Pinging 192.168.1.104
-Pinging 192.168.1.105
-Pinging 192.168.1.106
-Pinging 192.168.1.107
-Pinging 192.168.1.108
-Pinging 192.168.1.109
-Pinging 192.168.1.110
-Pinging 192.168.1.111
-Pinging 192.168.1.112
-Pinging 192.168.1.113
-Pinging 192.168.1.114
-Pinging 192.168.1.115
-Pinging 192.168.1.116
-Pinging 192.168.1.117
-Pinging 192.168.1.118
-Pinging 192.168.1.119
-Pinging 192.168.1.120
-Pinging 192.168.1.121
-Pinging 192.168.1.122
-Pinging 192.168.1.123
-Pinging 192.168.1.124
-Pinging 192.168.1.125
-Copying 13 chars to list at index: 1
-
-hostList updated.
-
-After copy: 192.168.1.125
-Pinging 192.168.1.126
-Pinging 192.168.1.127
-Pinging 192.168.1.128
-Pinging 192.168.1.129
-Pinging 192.168.1.130
-Pinging 192.168.1.131
-Pinging 192.168.1.132
-Pinging 192.168.1.133
-Pinging 192.168.1.134
-Pinging 192.168.1.135
-Pinging 192.168.1.136
-Pinging 192.168.1.137
-Pinging 192.168.1.138
-Pinging 192.168.1.139
-Pinging 192.168.1.140
-Pinging 192.168.1.141
-Pinging 192.168.1.142
-Copying 13 chars to list at index: 2
-
-hostList updated.
-
-After copy: 192.168.1.142
-Pinging 192.168.1.143
-Pinging 192.168.1.144
-Pinging 192.168.1.145
-Pinging 192.168.1.146
-Pinging 192.168.1.147
-Pinging 192.168.1.148
-Pinging 192.168.1.149
-Pinging 192.168.1.150
-Pinging 192.168.1.151
-Pinging 192.168.1.152
-Pinging 192.168.1.153
-Pinging 192.168.1.154
-Pinging 192.168.1.155
-Pinging 192.168.1.156
-Pinging 192.168.1.157
-Pinging 192.168.1.158
-Pinging 192.168.1.159
-Pinging 192.168.1.160
-Pinging 192.168.1.161
-Copying 13 chars to list at index: 3
-
-hostList updated.
-
-After copy: 192.168.1.161
-Pinging 192.168.1.162
-Pinging 192.168.1.163
-Pinging 192.168.1.164
-Pinging 192.168.1.165
-Pinging 192.168.1.166
-Pinging 192.168.1.167
-Pinging 192.168.1.168
-Pinging 192.168.1.169
-Pinging 192.168.1.170
-Pinging 192.168.1.171
-Pinging 192.168.1.172
-Pinging 192.168.1.173
-Pinging 192.168.1.174
-Pinging 192.168.1.175
-Pinging 192.168.1.176
-Pinging 192.168.1.177
-Pinging 192.168.1.178
-Pinging 192.168.1.179
-Pinging 192.168.1.180
-Pinging 192.168.1.181
-Pinging 192.168.1.182
-Pinging 192.168.1.183
-Pinging 192.168.1.184
-Pinging 192.168.1.185
-Pinging 192.168.1.186
-Pinging 192.168.1.187
-Pinging 192.168.1.188
-Pinging 192.168.1.189
-Pinging 192.168.1.190
-Pinging 192.168.1.191
-Pinging 192.168.1.192
-Pinging 192.168.1.193
-Pinging 192.168.1.194
-Pinging 192.168.1.195
-Pinging 192.168.1.196
-Pinging 192.168.1.197
-Pinging 192.168.1.198
-Pinging 192.168.1.199
-Pinging 192.168.1.200
-Pinging 192.168.1.201
-Pinging 192.168.1.202
-Pinging 192.168.1.203
-Pinging 192.168.1.204
-Pinging 192.168.1.205
-Pinging 192.168.1.206
-Pinging 192.168.1.207
-Pinging 192.168.1.208
-Pinging 192.168.1.209
-Pinging 192.168.1.210
-Pinging 192.168.1.211
-Pinging 192.168.1.212
-Pinging 192.168.1.213
-Pinging 192.168.1.214
-Pinging 192.168.1.215
-Pinging 192.168.1.216
-Pinging 192.168.1.217
-Pinging 192.168.1.218
-Copying 13 chars to list at index: 4
-
-hostList updated.
-
-After copy: 192.168.1.218
-Pinging 192.168.1.219
-Pinging 192.168.1.220
-Pinging 192.168.1.221
-Pinging 192.168.1.222
-Pinging 192.168.1.223
-Pinging 192.168.1.224
-Pinging 192.168.1.225
-Copying 13 chars to list at index: 5
-
-hostList updated.
-
-After copy: 192.168.1.225
-Pinging 192.168.1.226
-Pinging 192.168.1.227
-Pinging 192.168.1.228
-Pinging 192.168.1.229
-Pinging 192.168.1.230
-Pinging 192.168.1.231
-Pinging 192.168.1.232
-Pinging 192.168.1.233
-Pinging 192.168.1.234
-Pinging 192.168.1.235
-Pinging 192.168.1.236
-Pinging 192.168.1.237
-Pinging 192.168.1.238
-Pinging 192.168.1.239
-Pinging 192.168.1.240
-Pinging 192.168.1.241
-Pinging 192.168.1.242
-Pinging 192.168.1.243
-Pinging 192.168.1.244
-Pinging 192.168.1.245
-Pinging 192.168.1.246
-Pinging 192.168.1.247
-Pinging 192.168.1.248
-Pinging 192.168.1.249
-Pinging 192.168.1.250
-Pinging 192.168.1.251
-Pinging 192.168.1.252
-Pinging 192.168.1.253
-Pinging 192.168.1.254
-Pinging 192.168.1.255
-
-
-Printing list with 6 hosts included.
-*****************************************
-Host 1: 192.168.1.5
-Host 2: 192.168.1.125
-Host 3: 192.168.1.142
-Host 4: 192.168.1.161
-Host 5: 192.168.1.218
-Host 6: 192.168.1.225
-
-*****************************************
-
-Done.
-
 */
