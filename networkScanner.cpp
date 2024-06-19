@@ -44,11 +44,6 @@ void copyAddr(char (*hostList)[16], const char * source, int index)
     strncpy(hostList[index], source, adrLen);
     hostList[index][adrLen] = '\0';
     cout << "\nhostList updated." << endl;
-    //cout << "Copied " << adrLen << "chars..." << endl;
-    // if(strlen(source) == 16)
-    // {
-    //     hostList[index][15] = '\0';
-    // }
 }
 
 //****************************************************************************************
@@ -119,37 +114,29 @@ static void callBack(u_char * user, const struct pcap_pkthdr * pkthdr, const u_c
             cout <<"Received ICMP ECHO Reply packet..." << endl;
             context->result = true;
             pcap_breakloop(context->captureSession);
-            //break;
-            return;
+            //return;
         }
         else if (icmpHeader->type ==ICMP_DEST_UNREACH)
         {
             cout <<"Received ICMP DEST UNREACH packet..." << endl;
             context->result = false;
             pcap_breakloop(context->captureSession);
-            //break;
-            return;
+            //return;
         }
         else if (icmpHeader->type ==ICMP_TIME_EXCEEDED)
         {
             cout <<"Received ICMP TIME EXCEEDED packet..." << endl;
             context->result = false;
             pcap_breakloop(context->captureSession);
-            //break;
-            return;
+            //return;
         }
         else
         {
             cout << "Unknown response type. Skipping..." << endl;
             context->result = false;
             pcap_breakloop(context->captureSession);
-            //break;
-            return;
+            //return;
         }
-        // cout << "ICMP type: " << static_cast<int>(icmpHeader->type) << endl;
-        // context->result = false;
-        // pcap_breakloop(context->captureSession);
-        // return;
     }
     else
     {
@@ -187,21 +174,22 @@ bool pingSweep( char (&destination)[16], pcap_t * sendSession, pcap_t * captureS
     //     cout << "Error opening the NIC for injection: " << errorMsg << endl;
     // }
     //
-    // //char errorMsg [PCAP_ERRBUF_SIZE];
-    // //cout << "\n***Opening session..." << endl;
-    // captureSession = pcap_open_live("enp34s0", BUFSIZ, 1, 1000, errorMsg);
-    //
-    // if(captureSession == NULL)
-    // {
-    //     cout << "Error opening the NIC for capture: " << errorMsg << endl;
-    // }
+
+    char errorMsg [PCAP_ERRBUF_SIZE];
+    //cout << "\n***Opening session..." << endl;
+    context.captureSession = pcap_open_live("enp34s0", BUFSIZ, 1, 1000, errorMsg);
+
+    if(context.captureSession == NULL)
+    {
+        cout << "Error opening the NIC for capture: " << errorMsg << endl;
+    }
 
     // //Set the filter for ICMP packets
     struct bpf_program filter;
     bpf_u_int32 net;
     char filterExp[] = "icmp";
-    pcap_compile(captureSession, &filter, filterExp, 0, net);
-    pcap_setfilter(captureSession, &filter);
+    pcap_compile(context.captureSession, &filter, filterExp, 0, net);
+    pcap_setfilter(context.captureSession, &filter);
 
     //Fill in the headers for the echo request...
 
@@ -247,9 +235,9 @@ bool pingSweep( char (&destination)[16], pcap_t * sendSession, pcap_t * captureS
 
     //Set the timeout...
     //this_thread::sleep_for(chrono::seconds(1));
-    if(pcap_set_timeout(captureSession, timeout) == -1)
+    if(pcap_set_timeout(context.captureSession, timeout) == -1)
     {
-        cout << "Error setting the time out variable: " << pcap_geterr(captureSession) << endl;
+        cout << "Error setting the time out variable: " << pcap_geterr(context.captureSession) << endl;
     }
 
     // //Lambda..
@@ -312,7 +300,7 @@ bool pingSweep( char (&destination)[16], pcap_t * sendSession, pcap_t * captureS
 
     if(pcap_loop(context.captureSession, 0, callBack, reinterpret_cast<u_char *>(&context)) == -1)
     {
-        cout << "Error in pcap_loop(): " << pcap_geterr(captureSession) << endl;
+        cout << "Error in pcap_loop(): " << pcap_geterr(context.captureSession) << endl;
         result = false;
     }
 
@@ -419,21 +407,24 @@ bool pingSweep( char (&destination)[16], pcap_t * sendSession, pcap_t * captureS
         // }
     //}
 
-    // pcap_close(captureSession);
+    pcap_close(context.captureSession);
     // pcap_close(sendSession);
     return result;
 }
 
 //****************************************************************************************
 
-void getHosts(char (*hostList)[16], int & numHosts)
+void getHosts(char (*hostList)[16], int & numHosts, pcap_t * captureSession)
 {
     const char base [] = "192.168.1."; //Correctly initalize the base IP array...
     char destIP[16]; //Enough to hold an IP address in the form xxx.xxx.xxx.xxx
     int hostCount = 0;
 
-    pcap_t * captureSession;
+    //pcap_t * captureSession;
     pcap_t * sendSession;
+    bool result = false;
+
+    CaptureContext context{captureSession, result};
 
     char errorMsg [PCAP_ERRBUF_SIZE];
     //cout << "\n***Opening session..." << endl;
@@ -446,14 +437,9 @@ void getHosts(char (*hostList)[16], int & numHosts)
 
     //char errorMsg [PCAP_ERRBUF_SIZE];
     //cout << "\n***Opening session..." << endl;
-    captureSession = pcap_open_live("enp34s0", BUFSIZ, 1, 1000, errorMsg);
 
-    if(captureSession == NULL)
-    {
-        cout << "Error opening the NIC for capture: " << errorMsg << endl;
-    }
 
-    for (int i = 90; i <= 255; i ++)
+    for (int i = 90; i <= 95; i ++)
     {
         //Manually construct the IP address
         strcpy(destIP, base);
@@ -462,7 +448,7 @@ void getHosts(char (*hostList)[16], int & numHosts)
         //itoa(i, suffix);
         strcat(destIP, suffix);
 
-        if(pingSweep(destIP, sendSession, captureSession))
+        if(pingSweep(destIP, sendSession, context.captureSession))
         {
             if(hostCount < MAX_HOSTS)
             {
@@ -488,7 +474,7 @@ void getHosts(char (*hostList)[16], int & numHosts)
 
     numHosts = hostCount;
 
-    pcap_close(captureSession);
+    //pcap_close(context.captureSession);
     pcap_close(sendSession);
 }
 
@@ -746,11 +732,19 @@ int main()
 
     char hostList[MAX_HOSTS][16]; //Assuming each IP addr is stored in a 16-character array.
     int numHosts = 0;
+    char errorMsg [PCAP_ERRBUF_SIZE];
+    pcap_t * captureSession = pcap_open_live("enp34s0", BUFSIZ, 1, 1000, errorMsg);
+    bool result = false;
 
-    //openNetworkInterface();
-    getHosts(hostList, numHosts);
+    CaptureContext context{captureSession, result};
+
+
+
+    getHosts(hostList, numHosts, context.captureSession);
     displayHostList(hostList, numHosts);
-    pcap_close(session);
+
+
+
     return 0;
 }
 
