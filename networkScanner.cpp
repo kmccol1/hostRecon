@@ -101,11 +101,15 @@ static void callBack(u_char * user, const struct pcap_pkthdr * pkthdr, const u_c
 
     auto context = reinterpret_cast<CaptureContext*>(user);
 
-    struct ip * ipHeader = (struct ip *)(capPacket + 14); //Skip Ethernet header...
+    const int ethHeaderLen = 14;
+
+    struct ip * ipHeader = (struct ip *)(capPacket + ethHeaderLen); //Skip Ethernet header...
 
     if(ipHeader->ip_p == IPPROTO_ICMP)
     {
-        struct icmphdr * icmpHeader = (struct icmphdr *)(capPacket + 14 + (ipHeader->ip_hl << 2)); //Skip IP header...
+        int ipHeaderLen = ipHeader -> ip_hl * 4;
+
+        struct icmphdr * icmpHeader = (struct icmphdr *)(capPacket + ethHeaderLen + ipHeaderLen); //Skip IP header...
 
         cout << "ICMP type: " << static_cast<int>(icmpHeader->type) << endl;
 
@@ -114,35 +118,28 @@ static void callBack(u_char * user, const struct pcap_pkthdr * pkthdr, const u_c
             cout <<"Received ICMP ECHO Reply packet..." << endl;
             context->result = true;
             pcap_breakloop(context->captureSession);
-            //return;
         }
         else if (icmpHeader->type ==ICMP_DEST_UNREACH)
         {
             cout <<"Received ICMP DEST UNREACH packet..." << endl;
             context->result = false;
             pcap_breakloop(context->captureSession);
-            //return;
         }
         else if (icmpHeader->type ==ICMP_TIME_EXCEEDED)
         {
             cout <<"Received ICMP TIME EXCEEDED packet..." << endl;
             context->result = false;
             pcap_breakloop(context->captureSession);
-            //return;
         }
         else
         {
             cout << "Unknown response type. Skipping..." << endl;
             context->result = false;
             pcap_breakloop(context->captureSession);
-            //return;
         }
     }
     else
     {
-        // context->result = false;
-        // pcap_breakloop(context->captureSession);
-        // return;
         cout << "Not an ICMP packet. Skipping..." << endl;
     }
 }
@@ -185,11 +182,11 @@ bool pingSweep( char (&destination)[16], pcap_t * sendSession, pcap_t * captureS
     }
 
     // //Set the filter for ICMP packets
-    struct bpf_program filter;
-    bpf_u_int32 net;
-    char filterExp[] = "icmp";
-    pcap_compile(context.captureSession, &filter, filterExp, 0, net);
-    pcap_setfilter(context.captureSession, &filter);
+    // struct bpf_program filter;
+    // bpf_u_int32 net;
+    // char filterExp[] = "icmp";
+    // pcap_compile(context.captureSession, &filter, filterExp, 0, net);
+    // pcap_setfilter(context.captureSession, &filter);
 
     //Fill in the headers for the echo request...
 
@@ -738,12 +735,8 @@ int main()
 
     CaptureContext context{captureSession, result};
 
-
-
     getHosts(hostList, numHosts, context.captureSession);
     displayHostList(hostList, numHosts);
-
-
 
     return 0;
 }
@@ -753,4 +746,24 @@ int main()
 /*
 g++ networkScanner.cpp -lpcap -o networkScanner
 hostRecon> sudo ./networkScanner
+
+Not an ICMP packet. Skipping...
+ICMP type: 0
+Received ICMP ECHO Reply packet...
+Copying 12 chars to list at index: 1
+
+hostList updated.
+
+After copy: 192.168.1.95
+
+
+Printing list with 2 hosts included.
+*****************************************
+Host 1: 192.168.1.94
+Host 2: 192.168.1.95
+
+*****************************************
+
+Done.
+
 */
