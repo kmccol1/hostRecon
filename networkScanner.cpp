@@ -2,7 +2,7 @@
 //
 //    Filename: networkScanner.cpp
 //    Author:   Kyle McColgan
-//    Date:     17 June 2024
+//    Date:     24 June 2024
 //    Description: CLI based networking utility for preliminary network reconnaissance.
 //
 //****************************************************************************************
@@ -33,6 +33,8 @@ struct CaptureContext
 {
     pcap_t * captureSession;
     bool & result;
+    struct in_addr destination;
+    pcap_t * sendSession;
 };
 
 //****************************************************************************************
@@ -105,37 +107,42 @@ static void callBack(u_char * user, const struct pcap_pkthdr * pkthdr, const u_c
 
     struct ip * ipHeader = (struct ip *)(capPacket + ethHeaderLen); //Skip Ethernet header...
 
+    //Check protocol...
     if(ipHeader->ip_p == IPPROTO_ICMP)
     {
-        int ipHeaderLen = ipHeader -> ip_hl * 4;
+        //Compare the target's address to the response packet's header address info...
+        if(memcmp(&(context->destination), &(ipHeader->ip_src.s_addr), sizeof(struct in_addr)) == 0)
+        {
+            int ipHeaderLen = ipHeader -> ip_hl * 4;
 
-        struct icmphdr * icmpHeader = (struct icmphdr *)(capPacket + ethHeaderLen + ipHeaderLen); //Skip IP header...
+            struct icmphdr * icmpHeader = (struct icmphdr *)(capPacket + ethHeaderLen + ipHeaderLen); //Skip IP header...
 
-        cout << "ICMP type: " << static_cast<int>(icmpHeader->type) << endl;
+            cout << "ICMP type: " << static_cast<int>(icmpHeader->type) << endl;
 
-        if(icmpHeader->type ==ICMP_ECHOREPLY)
-        {
-            cout <<"Received ICMP ECHO Reply packet..." << endl;
-            context->result = true;
-            pcap_breakloop(context->captureSession);
-        }
-        else if (icmpHeader->type ==ICMP_DEST_UNREACH)
-        {
-            cout <<"Received ICMP DEST UNREACH packet..." << endl;
-            context->result = false;
-            pcap_breakloop(context->captureSession);
-        }
-        else if (icmpHeader->type ==ICMP_TIME_EXCEEDED)
-        {
-            cout <<"Received ICMP TIME EXCEEDED packet..." << endl;
-            context->result = false;
-            pcap_breakloop(context->captureSession);
-        }
-        else
-        {
-            cout << "Unknown response type. Skipping..." << endl;
-            context->result = false;
-            pcap_breakloop(context->captureSession);
+            if(icmpHeader->type ==ICMP_ECHOREPLY)
+            {
+                cout <<"Received ICMP ECHO Reply packet..." << endl;
+                context->result = true;
+                pcap_breakloop(context->captureSession);
+            }
+            else if (icmpHeader->type ==ICMP_DEST_UNREACH)
+            {
+                cout <<"Received ICMP DEST UNREACH packet..." << endl;
+                context->result = false;
+                pcap_breakloop(context->captureSession);
+            }
+            else if (icmpHeader->type ==ICMP_TIME_EXCEEDED)
+            {
+                cout <<"Received ICMP TIME EXCEEDED packet..." << endl;
+                context->result = false;
+                pcap_breakloop(context->captureSession);
+            }
+            else
+            {
+                cout << "Unknown response type. Skipping..." << endl;
+                context->result = false;
+                pcap_breakloop(context->captureSession);
+            }
         }
     }
     else
@@ -146,7 +153,7 @@ static void callBack(u_char * user, const struct pcap_pkthdr * pkthdr, const u_c
 
 //****************************************************************************************
 
-bool pingSweep( char (&destination)[16], pcap_t * sendSession, pcap_t * captureSession)
+bool pingSweep( char (&destination)[16], CaptureContext context)
 {
     bool result = false;
     struct ip ipHdr;
@@ -154,42 +161,11 @@ bool pingSweep( char (&destination)[16], pcap_t * sendSession, pcap_t * captureS
     unsigned char myPacket[sizeof(struct ip) + sizeof(struct icmphdr)];
     const u_char * capPacket;
     struct pcap_pkthdr header;
-    // pcap_t * captureSession;
-    // pcap_t * sendSession;
-    bool responseCaptured = false;
-    int timeout = 1000; //Timeout value in milliseconds.
 
-    CaptureContext context{captureSession, result};
-
-    //Open sendSession
-    // char errorMsg [PCAP_ERRBUF_SIZE];
-    // //cout << "\n***Opening session..." << endl;
-    // sendSession = pcap_open_live("enp34s0", BUFSIZ, 1, 1000, errorMsg);
-    //
-    // if(sendSession == NULL)
-    // {
-    //     cout << "Error opening the NIC for injection: " << errorMsg << endl;
-    // }
-    //
-
-    char errorMsg [PCAP_ERRBUF_SIZE];
-    //cout << "\n***Opening session..." << endl;
-    context.captureSession = pcap_open_live("enp34s0", BUFSIZ, 1, 1000, errorMsg);
-
-    if(context.captureSession == NULL)
-    {
-        cout << "Error opening the NIC for capture: " << errorMsg << endl;
-    }
-
-    // //Set the filter for ICMP packets
-    // struct bpf_program filter;
-    // bpf_u_int32 net;
-    // char filterExp[] = "icmp";
-    // pcap_compile(context.captureSession, &filter, filterExp, 0, net);
-    // pcap_setfilter(context.captureSession, &filter);
+    //CaptureContext context{captureSession, result};
+    inet_pton(AF_INET, destination, &context.destination);
 
     //Fill in the headers for the echo request...
-
     //Fill in the IP header...
     memset(&ipHdr, 0, sizeof(ipHdr));
     ipHdr.ip_hl = 5; //Header length.
@@ -224,228 +200,39 @@ bool pingSweep( char (&destination)[16], pcap_t * sendSession, pcap_t * captureS
 
     //send the packet using pcap_inject...
     cout << "\n***Pinging " << destination << "..." << endl;
-    if(pcap_inject(sendSession, &myPacket, sizeof(myPacket)) == -1)
+    if(pcap_inject(context.sendSession, &myPacket, sizeof(myPacket)) == -1)
     {
-        cout << "Error sending the packet: " << pcap_geterr(sendSession) << endl;
+        cout << "Error sending the packet: " << pcap_geterr(context.sendSession) << endl;
         result = false;
     }
 
-    //Set the timeout...
-    //this_thread::sleep_for(chrono::seconds(1));
-    if(pcap_set_timeout(context.captureSession, timeout) == -1)
-    {
-        cout << "Error setting the time out variable: " << pcap_geterr(context.captureSession) << endl;
-    }
-
-    // //Lambda..
-    // pcap_handler callback = [&context](u_char * user, const struct pcap_pkthdr * pkthdr, const u_char * capPacket) -> void
-    // {
-    //     auto context = reinterpret_cast<CaptureContext*>(user);
-    //
-    //     struct ip * ipHeader = (struct ip *)(capPacket + 14); //Skip Ethernet header...
-    //
-    //     if(ipHeader->ip_p == IPPROTO_ICMP)
-    //     {
-    //         struct icmphdr * icmpHeader = (struct icmphdr *)(capPacket + 14 + (ipHeader->ip_hl << 2)); //Skip IP header...
-    //
-    //         cout << "ICMP type: " << static_cast<int>(icmpHeader->type) << endl;
-    //
-    //         if(icmpHeader->type ==ICMP_ECHOREPLY)
-    //         {
-    //             cout <<"Received ICMP ECHO Reply packet..." << endl;
-    //             result = true;
-    //             pcap_breakloop(context);
-    //             //break;
-    //             return;
-    //         }
-    //         else if (icmpHeader->type ==ICMP_DEST_UNREACH)
-    //         {
-    //             cout <<"Received ICMP DEST UNREACH packet..." << endl;
-    //             result = false;
-    //             pcap_breakloop(context);
-    //             //break;
-    //             return;
-    //         }
-    //         else if (icmpHeader->type ==ICMP_TIME_EXCEEDED)
-    //         {
-    //             cout <<"Received ICMP TIME EXCEEDED packet..." << endl;
-    //             result = false;
-    //             pcap_breakloop(context);
-    //             //break;
-    //             return;
-    //         }
-    //         else
-    //         {
-    //             cout << "Unknown response type. Skipping..." << endl;
-    //             result = false;
-    //             pcap_breakloop(context);
-    //             //break;
-    //             return;
-    //         }
-    //         // cout << "ICMP type: " << static_cast<int>(icmpHeader->type) << endl;
-    //         result = false;
-    //         pcap_breakloop(captureSession);
-    //         return;
-    //     }
-    //     else
-    //     {
-    //         result = false;
-    //         pcap_breakloop(captureSession);
-    //         return;
-    //     }
-    // };
-
-    if(pcap_loop(context.captureSession, 0, callBack, reinterpret_cast<u_char *>(&context)) == -1)
+    if(pcap_loop(context.captureSession, 5, callBack, reinterpret_cast<u_char *>(&context)) == -1)
     {
         cout << "Error in pcap_loop(): " << pcap_geterr(context.captureSession) << endl;
         result = false;
     }
 
-    //Capture the response packet using pcap_next()...
-
-    // while(!responseCaptured)
-    // {
-        // if(pcap_inject(sendSession, &myPacket, sizeof(myPacket)) == -1)
-        // {
-        //     cout << "Error sending the packet: " << pcap_geterr(sendSession) << endl;
-        //     result = false;
-        // }
-        //else
-        //{
-        // if(pcap_set_timeout(captureSession, timeout) == -1)
-        // {
-        //     cout << "Error setting the time out variable: " << pcap_geterr(captureSession) << endl;
-        // }
-        // capPacket = pcap_next(captureSession, &header);
-        // //}
-        //
-        // if (capPacket == nullptr)
-        // {
-        //     cout << "No packet captured." << endl;
-        //     continue;
-        // }
-
-        // struct ip * ipHeader = (struct ip *)(capPacket + 14); //Skip Ethernet header...
-        // if(ipHeader->ip_p == IPPROTO_ICMP)
-        // {
-        //     struct icmphdr * icmpHeader = (struct icmphdr *)(capPacket + 14 + (ipHeader->ip_hl << 2)); //Skip IP header...
-        //
-        //     cout << "ICMP type: " << static_cast<int>(icmpHeader->type) << endl;
-        //
-        //     if(icmpHeader->type ==ICMP_ECHOREPLY)
-        //     {
-        //         cout <<"Received ICMP ECHO Reply packet..." << endl;
-        //         responseCaptured = true;
-        //         result = true;
-        //         break;
-        //     }
-        //     else if (icmpHeader->type ==ICMP_DEST_UNREACH)
-        //     {
-        //         cout <<"Received ICMP DEST UNREACH packet..." << endl;
-        //         responseCaptured = true;
-        //         result = false;
-        //         break;
-        //     }
-        //     else if (icmpHeader->type ==ICMP_TIME_EXCEEDED)
-        //     {
-        //         cout <<"Received ICMP TIME EXCEEDED packet..." << endl;
-        //         responseCaptured = true;
-        //         result = false;
-        //         break;
-        //     }
-        //     else
-        //     {
-        //         cout << "Unknown response type. Skipping..." << endl;
-        //         responseCaptured = true;
-        //         result = false;
-        //         break;
-        //     }
-        //     // cout << "ICMP type: " << static_cast<int>(icmpHeader->type) << endl;
-        // }
-    //}
-
-    //else
-    //{
-        //Check if it's an ICMP Echo Reply (type 0)
-        //struct ip * recvIPHdr = (struct ip *)(capPacket);
-        //const struct icmphdr * recvICMPHdr = (struct icmphdr *)(capPacket + sizeof(struct icmphdr) + sizeof(struct iphdr));
-
-
-        // const struct ethhdr * ethernetHeader;
-        // const struct iphdr * ipHeader;
-        // const struct icmphdr * icmpHeader;
-        //
-        // ethernetHeader = (ethhdr *)capPacket;
-        // ipHeader = (iphdr *)(capPacket + sizeof(ethhdr));
-        // icmpHeader = (icmphdr *)(capPacket + sizeof(ethhdr) + sizeof(iphdr));
-        //
-        // cout << "ICMP type: " << static_cast<int>(icmpHeader->type) << endl;
-
-        // if(ipHeader->protocol == IPPROTO_ICMP && icmpHeader->type == 0)
-        // {
-        //     cout << "Received ICMP Echo Reply from: " << destination << endl;
-        //     result = true;
-        // }
-        // // else if(recvICMPHdr -> type == ICMP_DEST_UNREACH)
-        // // {
-        // //     cout << "Received ICMP Dest Unreachable from: " << destination << endl;
-        // // }
-        // // else if(recvICMPHdr -> type == ICMP_TIME_EXCEEDED)
-        // // {
-        // //     cout << "Received ICMP Time Exceeded from: " << destination << endl;
-        // // }
-        // else if(ipHeader->protocol == IPPROTO_ICMP && icmpHeader->type == 8)
-        // {
-        //     cout << "\n***Received ICMP type 8!" << endl;
-        // }
-        // else
-        // {
-        //     cout << "Received ICMP type: " << (int)icmpHeader->type << endl;
-        // }
-    //}
-
-    pcap_close(context.captureSession);
-    // pcap_close(sendSession);
     return result;
 }
 
 //****************************************************************************************
 
-void getHosts(char (*hostList)[16], int & numHosts, pcap_t * captureSession)
+void getHosts(char (*hostList)[16], int & numHosts, CaptureContext context)
 {
     const char base [] = "192.168.1."; //Correctly initalize the base IP array...
     char destIP[16]; //Enough to hold an IP address in the form xxx.xxx.xxx.xxx
     int hostCount = 0;
-
-    //pcap_t * captureSession;
-    pcap_t * sendSession;
     bool result = false;
 
-    CaptureContext context{captureSession, result};
-
-    char errorMsg [PCAP_ERRBUF_SIZE];
-    //cout << "\n***Opening session..." << endl;
-    sendSession = pcap_open_live("enp34s0", BUFSIZ, 1, 1000, errorMsg);
-
-    if(sendSession == NULL)
-    {
-        cout << "Error opening the NIC for injection: " << errorMsg << endl;
-    }
-
-    //char errorMsg [PCAP_ERRBUF_SIZE];
-    //cout << "\n***Opening session..." << endl;
-
-
-    for (int i = 90; i <= 95; i ++)
+    for (int i = 93; i <= 95; i ++)
     {
         //Manually construct the IP address
         strcpy(destIP, base);
         char suffix [4]; //Sufficient for numbers 0-255
         intToCharArray(i, suffix); //Convert integer to string
-        //itoa(i, suffix);
         strcat(destIP, suffix);
 
-        if(pingSweep(destIP, sendSession, context.captureSession))
+        if(pingSweep(destIP, context))
         {
             if(hostCount < MAX_HOSTS)
             {
@@ -470,9 +257,6 @@ void getHosts(char (*hostList)[16], int & numHosts, pcap_t * captureSession)
     }
 
     numHosts = hostCount;
-
-    //pcap_close(context.captureSession);
-    pcap_close(sendSession);
 }
 
 //****************************************************************************************
@@ -507,31 +291,15 @@ bool isValidIPAddress(const char* address)
 
     while (*address)
     {
-        // if(*address == '.')
-        // {
-        //     if( (num < 0 ) || (num > 255))
-        //     {
-        //         result = false;
-        //     }
-        //     num=0;
-        //     dots ++;
-        // }
-        // else if(*address >= '0' && *address <= '9')
-        // {
-        //     num = num * 10 + (*address - '0');
-        // }
-        // else
-        // {
-        //     result = false; //Return false if a non-numeric character is found.
-        // }
-
         if(*address == '.')
         {
             numDots ++;
-            if ((numDigits < 1) || (numDigits > 3))
+
+            if ( (numDigits < 1) || (numDigits > 3) )
             {
                 result = false;
             }
+
             numDigits = 0;
         }
 
@@ -587,15 +355,7 @@ void displayHostList(char (*hostList)[16], int numHosts)
 
     for (int i = 0; i < numHosts; i ++)
     {
-        //for (int i = 0; i < 16; ++ i)
-        //{
-        //if(hostList[i][0] != '\0')
-        //{
         cout << "Host " << i+1 << ": " << hostList[i] << endl;
-        //}
-        //}
-        //cout << endl;
-        //cout << "Host " << i+1 << ": " << hostList[i] << endl;
     }
     cout << "\n*****************************************" << endl;
     cout << "\nDone." << endl;
@@ -643,100 +403,71 @@ void extractDeviceInfo(const u_char * packet, char (&source)[16], char(&destinat
 
 //****************************************************************************************
 
-void capturePackets(char (*hostList)[16], int maxLength, int & numHosts)
-{
-    int totalPackets;
-    struct pcap_pkthdr header;
-    const u_char * packet;
-    int numEntries = 0;
-    char source[16];
-    char destination[16];
-    int hostListSize = sizeof(hostList) / sizeof(hostList[0]);
-    int nextSlot = 0;
-    char ipStr[INET_ADDRSTRLEN]; //Define a buffer to store the converted IP addr...
-    char filteredIP[16];
-
-    while ( (hostList[nextSlot][0] != '\0') && (numEntries < MAX_HOSTS))
-    {
-        //numHosts = nextSlot;
-        nextSlot++;
-    }
-
-//     cout << "\n***Capturing packets..." << endl;
-//
-
-    //while (true)
-    //while(totalPackets < numPackets)
-    //while(hostListSize < totalHosts)
-    // while(/*(hostList[numEntries][0] != '\0') && */ numEntries < MAX_HOSTS)
-    // {
-    //     cout << "\n*****************************************" << endl;
-    //     packet = pcap_next(session, &header);
-    //     if(packet == NULL)
-    //     {
-    //         continue;
-    //     }
-    //     totalPackets++;
-    //     //cout << "\ntotal packets: " << totalPackets << endl;
-    //
-    //     extractDeviceInfo(packet, source, destination);
-    //     cout << "\nCaptured source info: " << source
-    //          << "..." << strlen(source) << " chars." << endl;
-    //
-    //     //Convert the source IP from ASCII to dotted-decimal format...
-    //     // inet_ntop(AF_INET, source, ipStr, INET_ADDRSTRLEN);
-    //     // cout << "Converted source info: " << source
-    //     //      << "..." << strlen(ipStr) << " chars." << endl;
-    //
-    //     //Update the hostList char array...
-    //
-    //     //if((isValidIPAddress(ipStr)) && (nextSlot < MAX_HOSTS))
-    //     if((numEntries < MAX_HOSTS) && (isValidIPAddress(source) == true) && (!inList(source, hostList, nextSlot)))
-    //     //if((nextSlot < MAX_HOSTS))
-    //     {
-    //         // cout << "Updating list with: " << ipStr << endl;
-    //         // filterSpecialChars(ipStr, filteredIP);
-    //
-    //         //cout << "\nBefore Copy: " << hostList[nextSlot] << endl; spec. chars...
-    //         copyAddr(hostList, source, numEntries); //numHosts or nextSlot...???
-    //         cout << "\nAfter copy: " << hostList[numEntries] << endl;
-    //
-    //         nextSlot++; //Increment the nextSlot for the next update...
-    //         numHosts++;
-    //         numEntries++;
-    //     }
-    //     else if(inList(source, hostList, nextSlot))
-    //     {
-    //         cout << "Duplicate entry found. Skipping..." << endl;
-    //         continue;
-    //     }
-    //     else
-    //     {
-    //         //Handle the case when the hostList is full...
-    //         cout << "Host list is full. Cannot add more hosts." << endl;
-    //         //numHosts = nextSlot;
-    //         //numHosts = hostListSize;
-    //         //displayHostList(hostList, numHosts);
-    //         break;
-    //     }
-    // }
-}
-
-//****************************************************************************************
-
 int main()
 {
-
+    bool result = false;
     char hostList[MAX_HOSTS][16]; //Assuming each IP addr is stored in a 16-character array.
     int numHosts = 0;
-    char errorMsg [PCAP_ERRBUF_SIZE];
-    pcap_t * captureSession = pcap_open_live("enp34s0", BUFSIZ, 1, 1000, errorMsg);
-    bool result = false;
+    char sendErrorMsg [PCAP_ERRBUF_SIZE];
+    char capErrorMsg [PCAP_ERRBUF_SIZE];
+    pcap_t * captureSession; /*= pcap_open_live("enp34s0", BUFSIZ, 1, 1000, errorMsg);*/
+    pcap_t * sendSession;
+    int timeout = 1000; //Timeout value in milliseconds.
 
-    CaptureContext context{captureSession, result};
+    //Open session handlers with a timeout of 1000 ms...
+    sendSession = pcap_open_live("enp34s0", BUFSIZ, 0, timeout, sendErrorMsg);
+    captureSession = pcap_open_live("enp34s0", BUFSIZ, 1, timeout, capErrorMsg);
 
-    getHosts(hostList, numHosts, context.captureSession);
+    if(sendSession == nullptr)
+    {
+        cout << "Error accessing the network interface for injection: " << sendErrorMsg << endl;
+        return 1;
+    }
+    else if (captureSession == nullptr)
+    {
+        cout << "Error accessing the network interface for capture: " << capErrorMsg << endl;
+        return 1;
+    }
+
+    // // //Set the filter for ICMP packets
+    struct bpf_program filter;
+    bpf_u_int32 net;
+    char filterExp[] = "icmp";
+
+    //Compile the filter expression...
+    if (pcap_compile(captureSession, &filter, filterExp, 0, net) == -1)
+    {
+        cout << "Couldn't parse filter: " << filterExp << ": "
+             << pcap_geterr(captureSession) << endl;
+
+        return 1;
+    }
+
+    //Apply the filter expression...
+    if (pcap_setfilter(captureSession, &filter) == -1)
+    {
+        cout << "Could not install filter: " << filterExp << ": "
+             << pcap_geterr(captureSession) << endl;
+
+        return 1;
+    }
+
+    cout << "\nFilter applied successfully!" << endl;
+
+    // //Set the timeout...
+    // //this_thread::sleep_for(chrono::seconds(1));
+    // if(pcap_set_timeout(captureSession, timeout) != 0) //1000 ms timeout
+    // {
+    //     cout << "Error setting the time out variable: " << pcap_geterr(captureSession) << endl;
+    // }
+
+    CaptureContext context{captureSession, result, .sendSession=sendSession};
+
+    getHosts(hostList, numHosts, context);
     displayHostList(hostList, numHosts);
+
+    pcap_close(context.captureSession);
+    pcap_close(context.sendSession);
 
     return 0;
 }
