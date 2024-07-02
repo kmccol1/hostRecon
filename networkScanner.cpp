@@ -2,8 +2,8 @@
 //
 //    Filename: networkScanner.cpp
 //    Author:   Kyle McColgan
-//    Date:     24 June 2024
-//    Description: CLI based networking utility for preliminary network reconnaissance.
+//    Date:     30 June 2024
+//    Description: CLI based networking utility for local network host enumeration.
 //
 //****************************************************************************************
 
@@ -26,14 +26,6 @@ using namespace std;
 const int MAX_HOSTS = 254; //Covers a typical /24 subnet, w/ 254 usable hosts.
 
 //****************************************************************************************
-
-//Ethernet header structure
-// struct ethhdr
-// {
-//     unsigned char h_dest[6]; // Destination MAC address...
-//     unsigned char h_source[6]; //Source MAC address...
-//     unsigned short h_proto; //Protocol type (e.g. ETH_P_IP for IP...)
-// };
 
 struct CaptureContext
 {
@@ -106,18 +98,11 @@ unsigned short computeChecksum(void * data, int length)
 
 static void callBack(u_char * user, const struct pcap_pkthdr * pkthdr, const u_char * capPacket)
 {
-    static int count = 0;
     auto context = reinterpret_cast<CaptureContext*>(user);
 
-    count++;
-
-    if(count == 1)
-    {
-        context->result = false;
-        return;
-    }
-
     const int ethHeaderLen = 14;
+
+    context->result = false;
 
     struct ip * ipHeader = (struct ip *)(capPacket + ethHeaderLen); //Skip Ethernet header...
 
@@ -125,9 +110,6 @@ static void callBack(u_char * user, const struct pcap_pkthdr * pkthdr, const u_c
     if(ipHeader->ip_p == IPPROTO_ICMP)
     {
         //Compare the target's address to the response packet's header address info...
-        //Currently, sourceStr is my IP adr....not the targets for some reason....
-        //cout << "\n***Comparing packets..." << endl;
-        //cout << "Target being scanned: " << inet_ntoa(context->destination) << endl;
 
         char sourceStr [INET_ADDRSTRLEN];
         char destStr [INET_ADDRSTRLEN];
@@ -140,9 +122,8 @@ static void callBack(u_char * user, const struct pcap_pkthdr * pkthdr, const u_c
         //cout << "\n***Response info for target: " << target << endl;
         cout << "Captured packet from: " << sourceStr << " to " << destStr << endl;
 
-        //if(memcmp(&(context->destination), &(ipHeader->ip_src), sizeof(struct in_addr)) == 0)
-        //if(strcmp(sourceStr, target) == 0)
-        //{
+        if(strcmp(sourceStr, target) == 0)
+        {
             int ipHeaderLen = ipHeader -> ip_hl * 4;
 
             struct icmphdr * icmpHeader = (struct icmphdr *)(capPacket + ethHeaderLen + ipHeaderLen); //Skip IP header...
@@ -152,61 +133,51 @@ static void callBack(u_char * user, const struct pcap_pkthdr * pkthdr, const u_c
             if(icmpHeader->type ==ICMP_ECHOREPLY)
             {
                 cout <<"Received ICMP ECHO Reply packet..." << endl;
-                cout << "Updating context->result...: " << context->result << endl;
+                //cout << "Updating context->result...: " << context->result << endl;
                 context->result = true;
-                cout << "Updated context->result...: " << context->result << endl;
-                //pcap_breakloop(context->captureSession);
-                return;
+                //cout << "Updated context->result...: " << context->result << endl;
             }
             else if (icmpHeader->type ==ICMP_DEST_UNREACH)
             {
                 cout <<"Received ICMP DEST UNREACH packet..." << endl;
-                context->result = false;
-                //pcap_breakloop(context->captureSession);
-                return;
+                //context->result = false;
             }
             else if (icmpHeader->type ==ICMP_TIME_EXCEEDED)
             {
                 cout <<"Received ICMP TIME EXCEEDED packet..." << endl;
-                context->result = false;
-                //pcap_breakloop(context->captureSession);
-                return;
+                //context->result = false;
             }
             else
             {
                 cout << "Unknown response type. Skipping..." << endl;
                 //context->result = false;
-                //pcap_breakloop(context->captureSession);
-                return;
             }
-        //}
-    }
-    else
-    {
-        cout << "Not an ICMP packet. Skipping..." << endl;
-        return;
-    }
 
-    return;
+            //context->result = true;
+            //pcap_breakloop(context->captureSession);
+            pcap_breakloop(reinterpret_cast<pcap_t *> (context->captureSession));
+            //return;
+        }
+    }
+    // else
+    // {
+    //     cout << "Not an ICMP packet. Skipping..." << endl;
+    //     context->result = false;
+    // }
 }
 
 //****************************************************************************************
 
 bool pingSweep( char (&destination)[16], CaptureContext context)
 {
-    bool result = false;
+    bool result = false;;
     struct ip ipHdr;
     struct icmphdr msgHdr;
     unsigned char myPacket[sizeof(struct ethhdr) + sizeof(struct ip) + sizeof(struct icmphdr)];
     const u_char * capPacket;
 
-    // struct ip ipHdr;
-    // struct icmphdr msgHdr;
-    // unsigned char myPacket[sizeof(struct ethhdr) + sizeof(struct ip) + sizeof(struct icmphdr)];
-    // const u_char * capPacket;
-
     //CaptureContext context{captureSession, result};
-    //inet_pton(AF_INET, destination, &context.destination);
+    inet_pton(AF_INET, destination, &context.destination); //This line is needed to fill in the context struct...
 
     //Fill in the headers for the echo request...
 
@@ -231,13 +202,6 @@ bool pingSweep( char (&destination)[16], CaptureContext context)
     ethHdr.h_source[4] = 0x11;
     ethHdr.h_source[5] = 0x03;
 
-    //Assume we have dest and src MAC addresses...
-    // uint8_t destMAC[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-    // uint8_t srcMAC[6] = {0x00, 0xD8, 0x61, 0xAB, 0x11, 0x03};
-
-    //memcpy(ethHdr.h_dest, destMAC, 6);
-    //memcpy(ethHdr.h_source, srcMAC, 6);
-
     //Set the protocol type to IP...
     ethHdr.h_proto = htons(ETH_P_IP);
 
@@ -259,7 +223,7 @@ bool pingSweep( char (&destination)[16], CaptureContext context)
     // ipHdr.ip_dst.s_addr = inet_addr("192.168.1.94");
 
     inet_pton(AF_INET, "192.168.1.213", &(ipHdr.ip_src)); //Source IP
-    inet_pton(AF_INET, "192.168.1.94", &(ipHdr.ip_dst)); //Destination IP
+    inet_pton(AF_INET, destination, &(ipHdr.ip_dst)); //Destination IP
 
     //Calculate the checksum for the IP header...
     // ipHdr.ip_sum = computeChecksum((unsigned short *)&ipHdr, sizeof(struct ip));
@@ -293,7 +257,7 @@ bool pingSweep( char (&destination)[16], CaptureContext context)
     }
 
     cout << "\n***Searching..." << endl;
-    if(/*(pcap_inject(context.sendSession, &myPacket, sizeof(myPacket)) == -1) ||*/ pcap_loop(context.captureSession, 2, callBack, reinterpret_cast<u_char *>(&context)) == -1)
+    if(pcap_loop(context.captureSession, 3, callBack, reinterpret_cast<u_char *>(&context)) == -1)
     {
         cout << "Error in pcap_loop(): " << pcap_geterr(context.captureSession) << endl;
         result = false;
@@ -317,7 +281,11 @@ void getHosts(char (*hostList)[16], int & numHosts, CaptureContext context)
     int hostCount = 0;
     bool result = false;
 
-    for (int i = 94; i < 95; i ++)
+    //Should start at 1 and end at 254. The IP address range in a /24 subnet is from
+    //x.x.x.0 to x.x.x.255.
+    //x.x.x.0 is the network address and is not assignable to a host.
+    //x.x.x.255 is trhe broadcast address and is also not assignable to a host.
+    for (int i = 93; i < 96; i ++)
     {
         //Manually construct the IP address
         strcpy(destIP, base);
@@ -450,7 +418,7 @@ void displayHostList(char (*hostList)[16], int numHosts)
     {
         cout << "Host " << i+1 << ": " << hostList[i] << endl;
     }
-    cout << "\n*****************************************" << endl;
+    cout << "*****************************************" << endl;
     cout << "\nDone." << endl;
 }
 
@@ -525,7 +493,7 @@ int main()
         return 1;
     }
 
-    // // //Set the filter for ICMP packets
+    //Set the filter for ICMP packets
     struct bpf_program filter;
     bpf_u_int32 net;
     char filterExp[] = "icmp";
@@ -558,6 +526,8 @@ int main()
     getHosts(hostList, numHosts, context);
     displayHostList(hostList, numHosts);
 
+    pcap_freecode(&filter);
+
     pcap_close(context.captureSession);
     pcap_close(context.sendSession);
 
@@ -566,149 +536,48 @@ int main()
 
 //****************************************************************************************
 
-// int main()
-// {
-//     bool result = false;
-//     char hostList[MAX_HOSTS][16]; //Assuming each IP addr is stored in a 16-character array.
-//     int numHosts = 0;
-//     char sendErrorMsg [PCAP_ERRBUF_SIZE];
-//     char capErrorMsg [PCAP_ERRBUF_SIZE];
-//     pcap_t * captureSession;
-//     pcap_t * sendSession;
-//     int timeout = 1000; //Timeout value in milliseconds.
-//
-//     //Open session handlers with a timeout of 1000 ms...
-//     sendSession = pcap_open_live("enp34s0", BUFSIZ, 0, timeout, sendErrorMsg);
-//     captureSession = pcap_open_live("enp34s0", BUFSIZ, 0, timeout, capErrorMsg);
-//
-//     if(sendSession == nullptr)
-//     {
-//         cout << "Error accessing the network interface for injection: " << sendErrorMsg << endl;
-//         return 1;
-//     }
-//
-//     struct ip ipHdr;
-//     struct icmphdr msgHdr;
-//     unsigned char myPacket[sizeof(struct ethhdr) + sizeof(struct ip) + sizeof(struct icmphdr)];
-//     const u_char * capPacket;
-//
-//     //CaptureContext context{captureSession, result};
-//     //inet_pton(AF_INET, destination, &context.destination);
-//
-//     //Fill in the headers for the echo request...
-//
-//     //Fill in the Ethernet header...
-//     struct ethhdr ethHdr;
-//     memset(&ethHdr, 0, sizeof(struct ethhdr));
-//
-//     //Set destination MAC address (example: broadcast address...)
-//     ethHdr.h_dest[0] = 0xff;
-//     ethHdr.h_dest[1] = 0xff;
-//     ethHdr.h_dest[2] = 0xff;
-//     ethHdr.h_dest[3] = 0xff;
-//     ethHdr.h_dest[4] = 0xff;
-//     ethHdr.h_dest[5] = 0xff;
-//     //
-//     // //Set source MAC address (example: your own MAC address...)
-//     // //Direct assignment...
-//     ethHdr.h_source[0] = 0x00;
-//     ethHdr.h_source[1] = 0xD8;
-//     ethHdr.h_source[2] = 0x61;
-//     ethHdr.h_source[3] = 0xAB;
-//     ethHdr.h_source[4] = 0x11;
-//     ethHdr.h_source[5] = 0x03;
-//
-//     //Assume we have dest and src MAC addresses...
-//     // uint8_t destMAC[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-//     // uint8_t srcMAC[6] = {0x00, 0xD8, 0x61, 0xAB, 0x11, 0x03};
-//
-//     //memcpy(ethHdr.h_dest, destMAC, 6);
-//     //memcpy(ethHdr.h_source, srcMAC, 6);
-//
-//     //Set the protocol type to IP...
-//     ethHdr.h_proto = htons(ETH_P_IP);
-//
-//     //Fill in the IP header...
-//     // memset(&ipHdr, 0, sizeof(ipHdr));
-//     memset(&ipHdr, 0, sizeof(struct ip));
-//     ipHdr.ip_hl = 5; //Header length.
-//     ipHdr.ip_v = 4; //IP version.
-//     ipHdr.ip_tos = 0; //Type of service
-//     // ipHdr.ip_len = htons(sizeof(struct ip)) + sizeof(struct icmphdr); //Total length
-//     ipHdr.ip_len = htons(sizeof(struct ip) + sizeof(struct icmphdr)); //Total length
-//     ipHdr.ip_id = htons(54321); //Identification.
-//     ipHdr.ip_off = 0; //Fragment Offset.
-//     // ipHdr.ip_ttl = 255; //Time to live.
-//     ipHdr.ip_ttl = 64; //Time to live.
-//     ipHdr.ip_p = IPPROTO_ICMP; //Protocol (ICMP)
-//     ipHdr.ip_sum = 0; //Checksum (set to 0 before calculating.)
-//     // ipHdr.ip_src.s_addr = inet_addr("192.168.1.213");
-//     // ipHdr.ip_dst.s_addr = inet_addr("192.168.1.94");
-//
-//     inet_pton(AF_INET, "192.168.1.213", &(ipHdr.ip_src)); //Source IP
-//     inet_pton(AF_INET, "192.168.1.94", &(ipHdr.ip_dst)); //Destination IP
-//
-//     //Calculate the checksum for the IP header...
-//     // ipHdr.ip_sum = computeChecksum((unsigned short *)&ipHdr, sizeof(struct ip));
-//     ipHdr.ip_sum = computeChecksum((unsigned short *)&ipHdr, sizeof(ipHdr));
-//
-//     //Fill in the ICMP header...
-//     memset(&msgHdr, 0, sizeof(struct icmphdr));
-//     msgHdr.type = ICMP_ECHO; //ICMP Echo request type.
-//     msgHdr.code = 0; //Code
-//     msgHdr.checksum = 0; //Checksum (set to 0 before calculating.)
-//     msgHdr.un.echo.id = htons(1234); //Identifier.
-//     msgHdr.un.echo.sequence = htons(1); //Sequence number.
-//
-//     //Calculate the checksum for the ICMP header...
-//     // msgHdr.checksum = computeChecksum((unsigned short *)&msgHdr, sizeof(struct icmphdr));
-//     msgHdr.checksum = computeChecksum((unsigned short *)&msgHdr, sizeof(struct icmphdr));
-//
-//     //Construct the packet, by combining the headers into one super packet...
-//     //int packetLen = sizeof(struct ip) + sizeof(struct icmphdr);
-//     //memset(myPacket, 0, sizeof(myPacket));
-//     memcpy(myPacket, &ethHdr, sizeof(struct ethhdr));
-//     memcpy(myPacket + sizeof(struct ethhdr), &ipHdr, sizeof(struct ip));
-//     memcpy(myPacket + sizeof(struct ethhdr) + sizeof(struct ip), &msgHdr, sizeof(icmphdr));
-//
-//     //send the packet using pcap_inject...
-//     //cout << "\n***Pinging " << destination << "..." << endl;
-//     if(pcap_inject(sendSession, myPacket, sizeof(myPacket)) == -1)
-//     {
-//         cout << "Error sending the packet: " << pcap_geterr(sendSession) << endl;
-//         result = false;
-//     }
-//
-//     int numBytes = pcap_inject(sendSession, &myPacket, sizeof(myPacket));
-//     if (numBytes > 0)
-//         cout << "\n***Sent some " << numBytes << " bytes over the wire." << endl;
-//     else
-//         cout << "AN ERROR OCCURED DURING TRANSPORT..." << endl;
-//
-//     return 0;
-// }
-
-//****************************************************************************************
-
 /*
 g++ networkScanner.cpp -lpcap -o networkScanner
 hostRecon> sudo ./networkScanner
 
-Not an ICMP packet. Skipping...
+Filter applied successfully!
+
+***Pinging 192.168.1.93...
+
+***Searching...
+Captured packet from: 192.168.1.213 to 192.168.1.93
+Captured packet from: 192.168.1.213 to 192.168.1.220
+Captured packet from: 192.168.1.213 to 192.168.1.237
+Inactive host detected. Skipping...
+
+***Pinging 192.168.1.94...
+
+***Searching...
+Captured packet from: 192.168.1.213 to 192.168.49.1
+Captured packet from: 192.168.1.213 to 192.168.1.94
+Captured packet from: 192.168.1.94 to 192.168.1.213
 ICMP type: 0
 Received ICMP ECHO Reply packet...
-Copying 12 chars to list at index: 1
+Success!
+Result: 1
+Copying 12 chars to list at index: 0
 
 hostList updated.
 
-After copy: 192.168.1.95
+After copy: 192.168.1.94
+
+***Pinging 192.168.1.95...
+
+***Searching...
+Captured packet from: 192.168.1.213 to 192.168.1.220
+Captured packet from: 192.168.1.213 to 192.168.1.237
+Captured packet from: 192.168.1.213 to 192.168.49.1
+Inactive host detected. Skipping...
 
 
-Printing list with 2 hosts included.
+Printing list with 1 hosts included.
 *****************************************
 Host 1: 192.168.1.94
-Host 2: 192.168.1.95
-
 *****************************************
 
 Done.
