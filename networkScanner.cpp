@@ -170,7 +170,7 @@ static void callBack(u_char * user, const struct pcap_pkthdr * pkthdr, const u_c
 
 bool pingSweep( char (&destination)[16], CaptureContext context)
 {
-    bool result = false;;
+    bool result = false;
     struct ip ipHdr;
     struct icmphdr msgHdr;
     unsigned char myPacket[sizeof(struct ethhdr) + sizeof(struct ip) + sizeof(struct icmphdr)];
