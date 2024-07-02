@@ -7,7 +7,7 @@ and troubleshoot potential issues effectively.
 
 **Current State:**
 The current state of the project successfully captures and analyzes IPv4 network packets.
-The project also included a significant improvement in packet handling, specfically within the callBack function used in the pcap_loop() call inside of the pingSweep function. The issue with detecting the appropriate timing to end the packet capture has been resolved by adjusting the active host conditional checks. The callBack function now effectively detects when to exit the pcap_loop() based on the captured packet's response details, ensuring that the network scanning process terminates correctly upon completion.
+The latest version of the project also includes a significant improvement in the network packet handling process, specfically within the callBack function used in the pcap_loop() call inside of the pingSweep function. The issue with detecting the appropriate timing to end the packet capture has been resolved by adjusting the active host conditional checks. The callBack function now effectively detects when to exit the pcap_loop() based on the captured packet's response details, ensuring that the network scanning process terminates correctly upon completion.
 This fix has greatly enhanced the stability and efficiency of the network scanner, preventing potential crashes and improving overall performance.
 
 **Future State:**
