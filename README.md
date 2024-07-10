@@ -1,16 +1,21 @@
-hostRecon - lightweight libpcap C++ network scanner
+hostRecon - libpcap C++ network scanner
 
 **Purpose of hostRecon:**
-The app aims to efficiently capture network packets for analysis and monitoring purposes.
-By providing a platform to capture and process packets, it enables users to gain insights into network traffic,
+The purpose of this project involves developing advanced network scanning capabilities to enhance security measures and improve network visibility.
+Leveraging innovating techniques such as ping sweeps, the project aims to provide comprehensive insights into network infrastructure, detect potential vulnerabilities, and strengthen overall security posture.
+With this network scanning program, users can painlessly gain insights into their networks,
 and troubleshoot potential issues effectively.
 
 **Current State:**
-The current state of the project successfully captures and analyzes IPv4 network packets.
-However, we have identified an issue with some entries in the hostList, resulting in special Unicode characters in the program output. We are actively investigating the conversion process for storing IP addresses to ensure proper formatting in the 'hostList' char array. By reviewing and refining this process, we aim to resolve this issue expeditiously and therefore improve the overall functionality and user-friendliness of the application.
+The project currently implements the ping sweep functionality, allowing for efficient detection of active network hosts within a /24 subnet on a traditional LAN.
+
+The current implementation also uses custom logic to handle ICMP Echo requests and responses without relying on system calls like to the 'ping' program/command.
+
+We are now focusing on optimizing and fine-tuning of the host response verification functionality and handling of captured network data packets to build a comprehensive list of active hosts.
 
 **Future State:**
-In the future, enhancing the error handling mechanisms within the app can help in identifying and resolving issues more effectively.
-Implementing robust logging functionalities to track the packet capture process can aid in troubleshooting any potential bottlenecks.
-Furthermore, incorperating real-time visualization of captured packets and adding filtering options based on specific criteria can
-elevate the app's functionality and user experience. Also, test driven development may offer additional benefits in the future.
+For the future, we aim to introduce ARP scans and SYN ACK scans to further enhance our network scanning capabilities.
+
+The ARP scan will facilitate local network host discovery, while SYN ACK scans will offer valuable port status information.
+
+This implementation will give us a more comprehensive view of the network, enabling us to detect and address security issues effectively. Stay tuned for these new features!
