@@ -106,64 +106,40 @@ static void callBack(u_char * user, const struct pcap_pkthdr * pkthdr, const u_c
 
     struct ip * ipHeader = (struct ip *)(capPacket + ethHeaderLen); //Skip Ethernet header...
 
-    //Check protocol...
     if(ipHeader->ip_p == IPPROTO_ICMP)
     {
-        //Compare the target's address to the response packet's header address info...
-
-        char sourceStr [INET_ADDRSTRLEN];
-        char destStr [INET_ADDRSTRLEN];
+        char sourceStr[INET_ADDRSTRLEN];
+        char destStr[INET_ADDRSTRLEN];
         char target[INET_ADDRSTRLEN];
 
         inet_ntop(AF_INET, &(ipHeader->ip_src.s_addr), sourceStr, INET_ADDRSTRLEN);
         inet_ntop(AF_INET, &(ipHeader->ip_dst.s_addr), destStr, INET_ADDRSTRLEN);
         inet_ntop(AF_INET, &(context->destination), target, INET_ADDRSTRLEN);
 
-        //cout << "\n***Response info for target: " << target << endl;
         cout << "Captured packet from: " << sourceStr << " to " << destStr << endl;
 
         if(strcmp(sourceStr, target) == 0)
         {
-            int ipHeaderLen = ipHeader -> ip_hl * 4;
+            int ipHeaderLen = ipHeader->ip_hl * 4;
 
-            struct icmphdr * icmpHeader = (struct icmphdr *)(capPacket + ethHeaderLen + ipHeaderLen); //Skip IP header...
+            struct icmphdr * icmpHeader = (struct icmphdr *)(capPacket + ethHeaderLen + ipHeaderLen);
 
-            cout << "ICMP type: " << static_cast<int>(icmpHeader->type) << endl;
-
-            if(icmpHeader->type ==ICMP_ECHOREPLY)
+            if(icmpHeader->type == ICMP_ECHOREPLY)
             {
-                cout <<"Received ICMP ECHO Reply packet..." << endl;
-                //cout << "Updating context->result...: " << context->result << endl;
+                cout << "Received ICMP ECHO Reply packet..." << endl;
                 context->result = true;
-                //cout << "Updated context->result...: " << context->result << endl;
-            }
-            else if (icmpHeader->type ==ICMP_DEST_UNREACH)
-            {
-                cout <<"Received ICMP DEST UNREACH packet..." << endl;
-                //context->result = false;
-            }
-            else if (icmpHeader->type ==ICMP_TIME_EXCEEDED)
-            {
-                cout <<"Received ICMP TIME EXCEEDED packet..." << endl;
-                //context->result = false;
+                pcap_breakloop(context->captureSession);
             }
             else
             {
-                cout << "Unknown response type. Skipping..." << endl;
-                //context->result = false;
+                cout << "ICMP type " << static_cast<int>(icmpHeader->type) << " received, ignoring..." << endl;
             }
-
-            //context->result = true;
-            //pcap_breakloop(context->captureSession);
-            pcap_breakloop(reinterpret_cast<pcap_t *> (context->captureSession));
-            //return;
         }
     }
-    // else
-    // {
-    //     cout << "Not an ICMP packet. Skipping..." << endl;
-    //     context->result = false;
-    // }
+    else
+    {
+        cout << "Not an ICMP packet. Skipping..." << endl;
+    }
 }
 
 //****************************************************************************************
@@ -257,7 +233,7 @@ bool pingSweep( char (&destination)[16], CaptureContext context)
     }
 
     cout << "\n***Searching..." << endl;
-    if(pcap_loop(context.captureSession, 3, callBack, reinterpret_cast<u_char *>(&context)) == -1)
+    if(pcap_loop(context.captureSession, 1, callBack, reinterpret_cast<u_char *>(&context)) == -1)
     {
         cout << "Error in pcap_loop(): " << pcap_geterr(context.captureSession) << endl;
         result = false;
@@ -535,51 +511,3 @@ int main()
 }
 
 //****************************************************************************************
-
-/*
-g++ networkScanner.cpp -lpcap -o networkScanner
-hostRecon> sudo ./networkScanner
-
-Filter applied successfully!
-
-***Pinging 192.168.1.93...
-
-***Searching...
-Captured packet from: 192.168.1.213 to 192.168.1.93
-Captured packet from: 192.168.1.213 to 192.168.1.220
-Captured packet from: 192.168.1.213 to 192.168.1.237
-Inactive host detected. Skipping...
-
-***Pinging 192.168.1.94...
-
-***Searching...
-Captured packet from: 192.168.1.213 to 192.168.49.1
-Captured packet from: 192.168.1.213 to 192.168.1.94
-Captured packet from: 192.168.1.94 to 192.168.1.213
-ICMP type: 0
-Received ICMP ECHO Reply packet...
-Success!
-Result: 1
-Copying 12 chars to list at index: 0
-
-hostList updated.
-
-After copy: 192.168.1.94
-
-***Pinging 192.168.1.95...
-
-***Searching...
-Captured packet from: 192.168.1.213 to 192.168.1.220
-Captured packet from: 192.168.1.213 to 192.168.1.237
-Captured packet from: 192.168.1.213 to 192.168.49.1
-Inactive host detected. Skipping...
-
-
-Printing list with 1 hosts included.
-*****************************************
-Host 1: 192.168.1.94
-*****************************************
-
-Done.
-
-*/
