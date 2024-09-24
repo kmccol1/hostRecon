@@ -233,7 +233,7 @@ bool pingSweep( char (&destination)[16], CaptureContext context)
     }
 
     cout << "\n***Searching..." << endl;
-    if(pcap_loop(context.captureSession, 1, callBack, reinterpret_cast<u_char *>(&context)) == -1)
+    if(pcap_loop(context.captureSession, 3, callBack, reinterpret_cast<u_char *>(&context)) == -1)
     {
         cout << "Error in pcap_loop(): " << pcap_geterr(context.captureSession) << endl;
         result = false;
@@ -452,7 +452,7 @@ int main()
     char capErrorMsg [PCAP_ERRBUF_SIZE];
     pcap_t * captureSession; /*= pcap_open_live("enp34s0", BUFSIZ, 1, 1000, errorMsg);*/
     pcap_t * sendSession;
-    int timeout = 1000; //Timeout value in milliseconds.
+    int timeout = 2000; //Timeout value in milliseconds.
 
     //Open session handlers with a timeout of 1000 ms...
     sendSession = pcap_open_live("enp34s0", BUFSIZ, 0, timeout, sendErrorMsg);
