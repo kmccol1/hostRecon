@@ -38,7 +38,6 @@ struct CaptureContext
     struct in_addr destination;
     pcap_t * sendSession;
 };
->>>>>>> ping_sweep
 
 //****************************************************************************************
 
@@ -49,8 +48,7 @@ void copyAddr(char (*hostList)[16], const char * source, int index)
     strncpy(hostList[index], source, adrLen);
     hostList[index][adrLen] = '\0';
     cout << "\nhostList updated." << endl;
-<<<<<<< HEAD
-=======
+
 }
 
 //****************************************************************************************
@@ -301,7 +299,6 @@ void getHosts(char (*hostList)[16], int & numHosts, CaptureContext context)
     }
 
     numHosts = hostCount;
->>>>>>> ping_sweep
 }
 
 //****************************************************************************************
@@ -447,7 +444,6 @@ void extractDeviceInfo(const u_char * packet, char (&source)[16], char(&destinat
     //cout << "Before source: " << sourceIP << endl;
     strncpy(source, sourceIP, sizeof(source));
     strncpy(destination, destinationIP, sizeof(destination));
-<<<<<<< HEAD
 }
 
 //****************************************************************************************
@@ -527,8 +523,6 @@ void capturePackets(char (*hostList)[16], int maxLength, int & numHosts)
             break;
         }
     }
-=======
->>>>>>> ping_sweep
 }
 
 //****************************************************************************************
