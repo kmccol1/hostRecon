@@ -23,10 +23,6 @@ using namespace std;
 
 //****************************************************************************************
 
-<<<<<<< HEAD
-const int MAX_HOSTS=10;
-pcap_t * session;
-=======
 const int MAX_HOSTS = 254; //Covers a typical /24 subnet, w/ 254 usable hosts.
 
 //****************************************************************************************
@@ -444,85 +440,6 @@ void extractDeviceInfo(const u_char * packet, char (&source)[16], char(&destinat
     //cout << "Before source: " << sourceIP << endl;
     strncpy(source, sourceIP, sizeof(source));
     strncpy(destination, destinationIP, sizeof(destination));
-}
-
-//****************************************************************************************
-
-void capturePackets(char (*hostList)[16], int maxLength, int & numHosts)
-{
-    int totalPackets;
-    struct pcap_pkthdr header;
-    const u_char * packet;
-    int numEntries = 0;
-    char source[16];
-    char destination[16];
-    int hostListSize = sizeof(hostList) / sizeof(hostList[0]);
-    int nextSlot = 0;
-    char ipStr[INET_ADDRSTRLEN]; //Define a buffer to store the converted IP addr...
-    char filteredIP[16];
-
-    while ( (hostList[nextSlot][0] != '\0') && (numEntries < MAX_HOSTS))
-    {
-        //numHosts = nextSlot;
-        nextSlot++;
-    }
-
-    cout << "\n***Capturing packets..." << endl;
-    //while (true)
-    //while(totalPackets < numPackets)
-    //while(hostListSize < totalHosts)
-    while(/*(hostList[numEntries][0] != '\0') && */ numEntries < MAX_HOSTS)
-    {
-        cout << "\n*****************************************" << endl;
-        packet = pcap_next(session, &header);
-        if(packet == NULL)
-        {
-            continue;
-        }
-        totalPackets++;
-        //cout << "\ntotal packets: " << totalPackets << endl;
-
-        extractDeviceInfo(packet, source, destination);
-        cout << "\nCaptured source info: " << source
-             << "..." << strlen(source) << " chars." << endl;
-
-        //Convert the source IP from ASCII to dotted-decimal format...
-        // inet_ntop(AF_INET, source, ipStr, INET_ADDRSTRLEN);
-        // cout << "Converted source info: " << source
-        //      << "..." << strlen(ipStr) << " chars." << endl;
-
-        //Update the hostList char array...
-
-        //if((isValidIPAddress(ipStr)) && (nextSlot < MAX_HOSTS))
-        if((numEntries < MAX_HOSTS) && (isValidIPAddress(source) == true) && (!inList(source, hostList, nextSlot)))
-        //if((nextSlot < MAX_HOSTS))
-        {
-            // cout << "Updating list with: " << ipStr << endl;
-            // filterSpecialChars(ipStr, filteredIP);
-
-            //cout << "\nBefore Copy: " << hostList[nextSlot] << endl; spec. chars...
-            copyAddr(hostList, source, numEntries); //numHosts or nextSlot...???
-            cout << "\nAfter copy: " << hostList[numEntries] << endl;
-
-            nextSlot++; //Increment the nextSlot for the next update...
-            numHosts++;
-            numEntries++;
-        }
-        else if(inList(source, hostList, nextSlot))
-        {
-            cout << "Duplicate entry found. Skipping..." << endl;
-            continue;
-        }
-        else
-        {
-            //Handle the case when the hostList is full...
-            cout << "Host list is full. Cannot add more hosts." << endl;
-            //numHosts = nextSlot;
-            //numHosts = hostListSize;
-            //displayHostList(hostList, numHosts);
-            break;
-        }
-    }
 }
 
 //****************************************************************************************
