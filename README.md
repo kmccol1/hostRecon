@@ -1,35 +1,87 @@
-hostRecon - libpcap C++ network scanner
+# hostRecon
 
-**Purpose of hostRecon:**
-The purpose of this project involves developing advanced network scanning capabilities to enhance security measures and improve network visibility.
-Leveraging innovating techniques such as ping sweeps, the project aims to provide comprehensive insights into network infrastructure, detect potential vulnerabilities, and strengthen overall security posture.
-With this network scanning program, users can painlessly gain insights into their networks,
-and troubleshoot potential issues effectively.
+## Overview
 
-**Current State:**
-<<<<<<< HEAD
-The project currently implements the ping sweep functionality, allowing for efficient detection of active network hosts within a /24 subnet on a traditional LAN.
+This repository contains code designed and developed as a CLI-based networking utility to facilitate local network host enumeration. It allows users to ping hosts within a specified subnet to determine their availability, leveraging low-level packet manipulation with `libpcap`. This tool is ideal for network administrators, security professionals, and anyone interested in exploring their local network.
 
-The current implementation also uses custom logic to handle ICMP Echo requests and responses without relying on system calls like to the 'ping' program/command.
+## Table of Contents
 
-We are now focusing on optimizing and fine-tuning of the host response verification functionality and handling of captured network data packets to build a comprehensive list of active hosts.
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Current State](#current-state)
+- [Future State](#future-state)
+- [Contributing](#contributing)
+- [License](#license)
 
-**Future State:**
-For the future, we aim to introduce ARP scans and SYN ACK scans to further enhance our network scanning capabilities.
+## Features
 
-The ARP scan will facilitate local network host discovery, while SYN ACK scans will offer valuable port status information.
+- Efficient ICMP Echo Request (ping) implementation
+- Captures and analyzes responses from active hosts
+- Customizable source and destination IP addresses
+- Concurrent pinging of multiple hosts
+- Error handling for network interface and packet capturing
+- User-friendly output for active hosts
 
-This implementation will give us a more comprehensive view of the network, enabling us to detect and address security issues effectively. Stay tuned for these new features!
-=======
-The current state of the project successfully captures and analyzes IPv4 network packets.
-The latest version of the project also includes a significant improvement in the network packet handling process, specfically within the callBack function used in the pcap_loop() call inside of the pingSweep function. The issue with detecting the appropriate timing to end the packet capture has been resolved by adjusting the active host conditional checks. The callBack function now effectively detects when to exit the pcap_loop() based on the captured packet's response details, ensuring that the network scanning process terminates correctly upon completion.
-This fix has greatly enhanced the stability and efficiency of the network scanner, preventing potential crashes and improving overall performance.
+## Installation
 
-**Future State:**
-In the future, enhancing the error handling mechanisms within the app can help in identifying and resolving issues more effectively.
-User-interface enhancements to develop a more intuitve and user-friendly interface.
-Improving the scanner with additional protocol support.
-Implementing robust logging functionalities to track the packet capture process can aid in troubleshooting any potential bottlenecks.
-Furthermore, incorperating real-time visualization of captured packets and adding filtering options based on specific criteria can
-elevate the app's functionality and user experience. Also, test driven development may offer additional benefits in the future.
->>>>>>> ping_sweep
+### Prerequisites
+
+- [libpcap](https://www.tcpdump.org/)
+- A C++ compiler (g++, clang, etc.)
+- CMake (optional for build automation)
+
+### Steps
+
+1. Clone this repository:
+
+   ```bash
+   https://github.com/kmccol1/hostRecon.git
+   cd network-scanner
+
+2. Compile the project:
+
+   ```bash
+   g++ networkScanner.cpp -o networkScanner -lpcap
+
+3. Run the scanner with appropriate privileges (usually as root):
+
+   ```bash
+   sudo ./networkScanner
+
+Usage
+
+To use hostRecon, simply run the compiled executable. The tool will automatically scan the local subnet for active hosts and display the results.
+Current State
+
+As of now, the hostRecon successfully provides:
+
+    Establishes a capture session to listen for ICMP Echo Replies.
+    Constructs and sends ICMP Echo Request packets to specified IP addresses within a /24 subnet.
+    Captures responses and accurately determines the active hosts based on received packets.
+    Displays the list of active hosts in a clear and concise format.
+
+The tool is currently focused on:
+
+    ICMP Protocol: Handling only ICMP packets to identify live hosts.
+    Basic Host Discovery: Scanning a predefined range of IP addresses (192.168.1.93 to 192.168.1.95).
+    Single-threaded Operation: Performing pings sequentially, limiting the speed of discovery.
+
+Future State
+
+In the upcoming versions, we plan to enhance hostRecon with the following features:
+
+    Multi-threading Support: Implement concurrent pings to improve scanning speed and efficiency.
+    Configurable Subnet: Allow users to specify the IP range and subnet mask dynamically.
+    Advanced Protocol Support: Expand capabilities to include TCP/UDP port scanning.
+    Detailed Reporting: Generate reports with additional information (e.g., response time, packet loss).
+    Improved Error Handling: Handle different network errors more gracefully with user feedback.
+    Graphical User Interface (GUI): Explore a GUI option for easier user interaction and visual representation of the network status.
+
+Contributing
+
+Contributions are welcome! Please read the CONTRIBUTING.md file for guidelines on how to contribute to this project.
+
+License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

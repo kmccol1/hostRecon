@@ -2,7 +2,7 @@
 //
 //    Filename: networkScanner.cpp
 //    Author:   Kyle McColgan
-//    Date:     30 June 2024
+//    Date:     27 September 2024
 //    Description: CLI based networking utility for local network host enumeration.
 //
 //****************************************************************************************
@@ -95,6 +95,7 @@ unsigned short computeChecksum(void * data, int length)
     return result;
 }
 
+
 //****************************************************************************************
 
 static void callBack(u_char * user, const struct pcap_pkthdr * pkthdr, const u_char * capPacket)
@@ -127,7 +128,7 @@ static void callBack(u_char * user, const struct pcap_pkthdr * pkthdr, const u_c
 
             if(icmpHeader->type == ICMP_ECHOREPLY)
             {
-                cout << "Received ICMP ECHO Reply packet..." << endl;
+                cout << "Received ICMP ECHO Reply packet from " << sourceStr << endl;
                 context->result = true;
                 pcap_breakloop(context->captureSession);
             }
@@ -135,6 +136,10 @@ static void callBack(u_char * user, const struct pcap_pkthdr * pkthdr, const u_c
             {
                 cout << "ICMP type " << static_cast<int>(icmpHeader->type) << " received, ignoring..." << endl;
             }
+        }
+        else
+        {
+            cout << "Response from a different host. Ignoring..." << endl;
         }
     }
     else
@@ -145,152 +150,120 @@ static void callBack(u_char * user, const struct pcap_pkthdr * pkthdr, const u_c
 
 //****************************************************************************************
 
-bool pingSweep( char (&destination)[16], CaptureContext context)
-{
+bool pingSweep(char (&destination)[16], CaptureContext &context) {
     bool result = false;
     struct ip ipHdr;
     struct icmphdr msgHdr;
     unsigned char myPacket[sizeof(struct ethhdr) + sizeof(struct ip) + sizeof(struct icmphdr)];
-    const u_char * capPacket;
 
-    //CaptureContext context{captureSession, result};
-    inet_pton(AF_INET, destination, &context.destination); //This line is needed to fill in the context struct...
+    // Initialize the destination IP in the context struct
+    inet_pton(AF_INET, destination, &context.destination);
 
-    //Fill in the headers for the echo request...
-
-    //Fill in the Ethernet header...
+    // Fill in the Ethernet header
     struct ethhdr ethHdr;
     memset(&ethHdr, 0, sizeof(struct ethhdr));
-
-    //Set destination MAC address (example: broadcast address...)
-    ethHdr.h_dest[0] = 0xff;
-    ethHdr.h_dest[1] = 0xff;
-    ethHdr.h_dest[2] = 0xff;
-    ethHdr.h_dest[3] = 0xff;
-    ethHdr.h_dest[4] = 0xff;
-    ethHdr.h_dest[5] = 0xff;
-    //
-    // //Set source MAC address (example: your own MAC address...)
-    // //Direct assignment...
-    ethHdr.h_source[0] = 0x00;
+    memset(&ethHdr.h_dest, 0xff, ETH_ALEN); // Broadcast MAC address
+    ethHdr.h_source[0] = 0x00; // Set your own MAC address
     ethHdr.h_source[1] = 0xD8;
     ethHdr.h_source[2] = 0x61;
     ethHdr.h_source[3] = 0xAB;
     ethHdr.h_source[4] = 0x11;
     ethHdr.h_source[5] = 0x03;
+    ethHdr.h_proto = htons(ETH_P_IP); // Protocol type for IP
 
-    //Set the protocol type to IP...
-    ethHdr.h_proto = htons(ETH_P_IP);
-
-    //Fill in the IP header...
-    // memset(&ipHdr, 0, sizeof(ipHdr));
+    // Fill in the IP header
     memset(&ipHdr, 0, sizeof(struct ip));
-    ipHdr.ip_hl = 5; //Header length.
-    ipHdr.ip_v = 4; //IP version.
-    ipHdr.ip_tos = 0; //Type of service
-    // ipHdr.ip_len = htons(sizeof(struct ip)) + sizeof(struct icmphdr); //Total length
-    ipHdr.ip_len = htons(sizeof(struct ip) + sizeof(struct icmphdr)); //Total length
-    ipHdr.ip_id = htons(54321); //Identification.
-    ipHdr.ip_off = 0; //Fragment Offset.
-    // ipHdr.ip_ttl = 255; //Time to live.
-    ipHdr.ip_ttl = 64; //Time to live.
-    ipHdr.ip_p = IPPROTO_ICMP; //Protocol (ICMP)
-    ipHdr.ip_sum = 0; //Checksum (set to 0 before calculating.)
-    // ipHdr.ip_src.s_addr = inet_addr("192.168.1.213");
-    // ipHdr.ip_dst.s_addr = inet_addr("192.168.1.94");
+    ipHdr.ip_hl = 5; // Header length
+    ipHdr.ip_v = 4; // IP version
+    ipHdr.ip_tos = 0; // Type of service
+    ipHdr.ip_len = htons(sizeof(struct ip) + sizeof(struct icmphdr)); // Total length
+    ipHdr.ip_id = htons(54321); // Identification
+    ipHdr.ip_off = 0; // Fragment Offset
+    ipHdr.ip_ttl = 64; // Time to live
+    ipHdr.ip_p = IPPROTO_ICMP; // Protocol (ICMP)
+    ipHdr.ip_sum = 0; // Checksum
+    inet_pton(AF_INET, "192.168.1.110", &ipHdr.ip_src); // Source IP
+    inet_pton(AF_INET, destination, &ipHdr.ip_dst); // Destination IP
+    ipHdr.ip_sum = computeChecksum((unsigned short *)&ipHdr, sizeof(struct ip)); // Calculate checksum
 
-    inet_pton(AF_INET, "192.168.1.213", &(ipHdr.ip_src)); //Source IP
-    inet_pton(AF_INET, destination, &(ipHdr.ip_dst)); //Destination IP
-
-    //Calculate the checksum for the IP header...
-    // ipHdr.ip_sum = computeChecksum((unsigned short *)&ipHdr, sizeof(struct ip));
-    ipHdr.ip_sum = computeChecksum((unsigned short *)&ipHdr, sizeof(ipHdr));
-
-    //Fill in the ICMP header...
+    // Fill in the ICMP header
     memset(&msgHdr, 0, sizeof(struct icmphdr));
-    msgHdr.type = ICMP_ECHO; //ICMP Echo request type.
-    msgHdr.code = 0; //Code
-    msgHdr.checksum = 0; //Checksum (set to 0 before calculating.)
-    msgHdr.un.echo.id = htons(1234); //Identifier.
-    msgHdr.un.echo.sequence = htons(1); //Sequence number.
+    msgHdr.type = ICMP_ECHO; // ICMP Echo request type
+    msgHdr.code = 0; // Code
+    msgHdr.checksum = 0; // Checksum
+    msgHdr.un.echo.id = htons(1234); // Identifier
+    msgHdr.un.echo.sequence = htons(1); // Sequence number
+    msgHdr.checksum = computeChecksum((unsigned short *)&msgHdr, sizeof(struct icmphdr)); // Calculate checksum
 
-    //Calculate the checksum for the ICMP header...
-    // msgHdr.checksum = computeChecksum((unsigned short *)&msgHdr, sizeof(struct icmphdr));
-    msgHdr.checksum = computeChecksum((unsigned short *)&msgHdr, sizeof(struct icmphdr));
-
-    //Construct the packet, by combining the headers into one super packet...
-    //int packetLen = sizeof(struct ip) + sizeof(struct icmphdr);
-    //memset(myPacket, 0, sizeof(myPacket));
+    // Construct the packet by combining the headers
     memcpy(myPacket, &ethHdr, sizeof(struct ethhdr));
     memcpy(myPacket + sizeof(struct ethhdr), &ipHdr, sizeof(struct ip));
-    memcpy(myPacket + sizeof(struct ethhdr) + sizeof(struct ip), &msgHdr, sizeof(icmphdr));
+    memcpy(myPacket + sizeof(struct ethhdr) + sizeof(struct ip), &msgHdr, sizeof(struct icmphdr));
 
-    //send the packet using pcap_inject...
+    // Send the packet using pcap_inject
     cout << "\n***Pinging " << destination << "..." << endl;
-    if(pcap_inject(context.sendSession, myPacket, sizeof(myPacket)) == -1)
-    {
+    if (pcap_inject(context.sendSession, myPacket, sizeof(myPacket)) == -1) {
         cout << "Error sending the packet: " << pcap_geterr(context.sendSession) << endl;
-        result = false;
+        return false;
     }
 
-    cout << "\n***Searching..." << endl;
-    if(pcap_loop(context.captureSession, 3, callBack, reinterpret_cast<u_char *>(&context)) == -1)
-    {
-        cout << "Error in pcap_loop(): " << pcap_geterr(context.captureSession) << endl;
-        result = false;
+    cout << "\n***Searching for a response..." << endl;
+
+    // Use pcap_dispatch for a specified number of packets
+    if (pcap_dispatch(context.captureSession, 10, callBack, reinterpret_cast<u_char *>(&context)) == -1) {
+        cout << "Error in pcap_dispatch(): " << pcap_geterr(context.captureSession) << endl;
+        return false;
     }
-    else if(context.result == true)
-    {
-        cout << "Success!" << endl;
+
+    // Check the result after capturing packets
+    if (context.result) {
+        cout << "Success! Received response from " << destination << endl;
         result = true;
-        cout << "Result: " << result << endl;
+    } else {
+        cout << "No response from " << destination << endl;
     }
 
     return result;
 }
-
 //****************************************************************************************
 
-void getHosts(char (*hostList)[16], int & numHosts, CaptureContext context)
-{
-    const char base [] = "192.168.1."; //Correctly initalize the base IP array...
-    char destIP[16]; //Enough to hold an IP address in the form xxx.xxx.xxx.xxx
+void getHosts(char (*hostList)[16], int &numHosts, CaptureContext &context) {
+    const char base[] = "192.168.1.";
+    char destIP[16];
     int hostCount = 0;
-    bool result = false;
 
-    //Should start at 1 and end at 254. The IP address range in a /24 subnet is from
-    //x.x.x.0 to x.x.x.255.
-    //x.x.x.0 is the network address and is not assignable to a host.
-    //x.x.x.255 is trhe broadcast address and is also not assignable to a host.
-    for (int i = 93; i < 96; i ++)
-    {
-        //Manually construct the IP address
+    for (int i = 93; i < 96; i++) {
         strcpy(destIP, base);
-        char suffix [4]; //Sufficient for numbers 0-255
-        intToCharArray(i, suffix); //Convert integer to string
+        char suffix[4];
+        intToCharArray(i, suffix);
         strcat(destIP, suffix);
 
-        if(pingSweep(destIP, context))
-        {
-            if(hostCount < MAX_HOSTS)
-            {
+        cout << "***Pinging " << destIP << "...\n";
 
-                copyAddr(hostList, destIP, hostCount);
+        context.result = false;
 
-                cout << "\nAfter copy: " << hostList[hostCount] << endl;
+        // Start timing for response
+        auto startTime = std::chrono::steady_clock::now();
+        while (std::chrono::steady_clock::now() - startTime < std::chrono::milliseconds(2000)) {
+            // Call pingSweep with the correct context
+            pingSweep(destIP, context);
 
-                hostCount ++;
-            }
-            else
-            {
-
-                cout << "Error: hostList is full, unable to add more hosts." << endl;
+            // Check if we got a response
+            if (context.result) {
+                cout << "Host " << destIP << " is active.\n";
+                if (hostCount < MAX_HOSTS) {
+                    copyAddr(hostList, destIP, hostCount);
+                    hostCount++;
+                } else {
+                    cout << "Error: hostList is full, unable to add more hosts." << endl;
+                    break;
+                }
                 break;
             }
         }
-        else
-        {
-            cout << "Inactive host detected. Skipping..." << endl;
+
+        if (!context.result) {
+            cout << "Inactive host detected. Skipping...\n";
         }
     }
 
