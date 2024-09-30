@@ -2,7 +2,7 @@
 //
 //    Filename: networkScanner.cpp
 //    Author:   Kyle McColgan
-//    Date:     27 September 2024
+//    Date:     30 September 2024
 //    Description: CLI based networking utility for local network host enumeration.
 //
 //****************************************************************************************
@@ -44,7 +44,6 @@ void copyAddr(char (*hostList)[16], const char * source, int index)
     strncpy(hostList[index], source, adrLen);
     hostList[index][adrLen] = '\0';
     cout << "\nhostList updated." << endl;
-
 }
 
 //****************************************************************************************
@@ -118,15 +117,16 @@ static void callBack(u_char * user, const struct pcap_pkthdr * pkthdr, const u_c
         inet_ntop(AF_INET, &(ipHeader->ip_dst.s_addr), destStr, INET_ADDRSTRLEN);
         inet_ntop(AF_INET, &(context->destination), target, INET_ADDRSTRLEN);
 
-        cout << "Captured packet from: " << sourceStr << " to " << destStr << endl;
+        //Uncomment line below for debugging purposes:
+        //cout << "Captured packet from: " << sourceStr << " to " << destStr << endl;
 
-        if(strcmp(sourceStr, target) == 0)
+        if (strcmp(sourceStr, target) == 0)
         {
             int ipHeaderLen = ipHeader->ip_hl * 4;
 
             struct icmphdr * icmpHeader = (struct icmphdr *)(capPacket + ethHeaderLen + ipHeaderLen);
 
-            if(icmpHeader->type == ICMP_ECHOREPLY)
+            if ( ( icmpHeader->type ) == ( ICMP_ECHOREPLY) )
             {
                 cout << "Received ICMP ECHO Reply packet from " << sourceStr << endl;
                 context->result = true;
@@ -139,7 +139,9 @@ static void callBack(u_char * user, const struct pcap_pkthdr * pkthdr, const u_c
         }
         else
         {
-            cout << "Response from a different host. Ignoring..." << endl;
+            //cout << "Response from a different host. Skipping..." << endl;
+            //cout << ".";
+            cout << endl;
         }
     }
     else
@@ -207,7 +209,7 @@ bool pingSweep(char (&destination)[16], CaptureContext &context) {
         return false;
     }
 
-    cout << "\n***Searching for a response..." << endl;
+    //cout << "\n***Searching for a response..." << endl;
 
     // Use pcap_dispatch for a specified number of packets
     if (pcap_dispatch(context.captureSession, 10, callBack, reinterpret_cast<u_char *>(&context)) == -1) {
@@ -216,45 +218,57 @@ bool pingSweep(char (&destination)[16], CaptureContext &context) {
     }
 
     // Check the result after capturing packets
-    if (context.result) {
-        cout << "Success! Received response from " << destination << endl;
+    if (context.result)
+    {
+        cout << "Response received from " << destination << endl;
+        cout << "Host " << destination << " is active!" << endl;
         result = true;
-    } else {
-        cout << "No response from " << destination << endl;
+    }
+    else
+    {
+        cout << "No response." << endl;
+        cout << "Host " << destination << " is inactive." << endl;
     }
 
     return result;
 }
 //****************************************************************************************
 
-void getHosts(char (*hostList)[16], int &numHosts, CaptureContext &context) {
+void getHosts(char (*hostList)[16], int &numHosts, CaptureContext &context)
+{
     const char base[] = "192.168.1.";
     char destIP[16];
     int hostCount = 0;
 
-    for (int i = 93; i < 96; i++) {
+    for (int i = 93; i < 96; i++)
+    {
         strcpy(destIP, base);
         char suffix[4];
         intToCharArray(i, suffix);
         strcat(destIP, suffix);
 
-        cout << "***Pinging " << destIP << "...\n";
+        //cout << "***Pinging " << destIP << "...\n";
 
         context.result = false;
 
         // Start timing for response
         auto startTime = std::chrono::steady_clock::now();
-        while (std::chrono::steady_clock::now() - startTime < std::chrono::milliseconds(2000)) {
+        while (std::chrono::steady_clock::now() - startTime < std::chrono::milliseconds(2000))
+        {
             // Call pingSweep with the correct context
             pingSweep(destIP, context);
 
             // Check if we got a response
-            if (context.result) {
-                cout << "Host " << destIP << " is active.\n";
-                if (hostCount < MAX_HOSTS) {
+            if (context.result)
+            {
+                //cout << "Host " << destIP << " is active.\n";
+                if (hostCount < MAX_HOSTS)
+                {
                     copyAddr(hostList, destIP, hostCount);
                     hostCount++;
-                } else {
+                }
+                else
+                {
                     cout << "Error: hostList is full, unable to add more hosts." << endl;
                     break;
                 }
@@ -262,9 +276,9 @@ void getHosts(char (*hostList)[16], int &numHosts, CaptureContext &context) {
             }
         }
 
-        if (!context.result) {
-            cout << "Inactive host detected. Skipping...\n";
-        }
+        // if (!context.result) {
+        //     cout << "Inactive host detected. Skipping...\n";
+        // }
     }
 
     numHosts = hostCount;
@@ -361,15 +375,17 @@ bool inList(const char* address, char (*hostList)[16], int listSize)
 
 void displayHostList(char (*hostList)[16], int numHosts)
 {
-    cout << "\n\nPrinting list with " << numHosts << " hosts included." << endl;
-    cout << "*****************************************" << endl;
+    //cout << "\n\nPrinting list with " << numHosts << " hosts included." << endl;
+    //cout << "*****************************************" << endl;
+    cout << "Active Hosts List: " << endl;
 
     for (int i = 0; i < numHosts; i ++)
     {
-        cout << "Host " << i+1 << ": " << hostList[i] << endl;
+        cout << i + 1 << ". " << hostList[i] << endl;
     }
-    cout << "*****************************************" << endl;
-    cout << "\nDone." << endl;
+    //cout << "*****************************************" << endl;
+    cout << "----------------------------------" << endl;
+    //cout << "\nDone." << endl;
 }
 
 //****************************************************************************************
@@ -470,10 +486,12 @@ int main()
     }
 
     cout << "\nFilter applied successfully!" << endl;
+    cout << "----------------------------------" << endl;
 
     CaptureContext context{captureSession, result, .sendSession=sendSession};
 
     getHosts(hostList, numHosts, context);
+    cout << "----------------------------------" << endl;
     displayHostList(hostList, numHosts);
 
     pcap_freecode(&filter);
