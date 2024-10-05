@@ -1,8 +1,8 @@
 //****************************************************************************************
 //
-//    Filename: networkScanner.cpp
-//    Author:   Kyle McColgan
-//    Date:     30 September 2024
+//    Filename:    networkScanner.cpp
+//    Author:      Kyle McColgan
+//    Date:        4 October 2024
 //    Description: CLI based networking utility for local network host enumeration.
 //
 //****************************************************************************************
@@ -16,14 +16,13 @@
 #include <arpa/inet.h>
 #include <algorithm> //For std::reverse()
 #include <cstdlib>
-#include <thread>
 #include <chrono>
 #include <netinet/in.h> //For struct definitions
 using namespace std;
 
 //****************************************************************************************
 
-const int MAX_HOSTS = 254; //Covers a typical /24 subnet, w/ 254 usable hosts.
+const int MAX_HOSTS = 254; //Covers a typical /24 subnet, with 254 usable hosts.
 
 //****************************************************************************************
 
@@ -240,7 +239,7 @@ void getHosts(char (*hostList)[16], int &numHosts, CaptureContext &context)
     char destIP[16];
     int hostCount = 0;
 
-    for (int i = 93; i < 96; i++)
+    for (int i = 1; i < 255; i++)
     {
         strcpy(destIP, base);
         char suffix[4];
@@ -436,11 +435,11 @@ void extractDeviceInfo(const u_char * packet, char (&source)[16], char(&destinat
 int main()
 {
     bool result = false;
-    char hostList[MAX_HOSTS][16]; //Assuming each IP addr is stored in a 16-character array.
+    char hostList [MAX_HOSTS][16]; //Assuming each IP addr is stored in a 16-character array.
     int numHosts = 0;
     char sendErrorMsg [PCAP_ERRBUF_SIZE];
     char capErrorMsg [PCAP_ERRBUF_SIZE];
-    pcap_t * captureSession; /*= pcap_open_live("enp34s0", BUFSIZ, 1, 1000, errorMsg);*/
+    pcap_t * captureSession;
     pcap_t * sendSession;
     int timeout = 2000; //Timeout value in milliseconds.
 
@@ -503,3 +502,34 @@ int main()
 }
 
 //****************************************************************************************
+
+/*
+No response.
+Host 192.168.1.253 is inactive.
+
+***Pinging 192.168.1.254...
+
+Received ICMP ECHO Reply packet from 192.168.1.254
+Response received from 192.168.1.254
+Host 192.168.1.254 is active!
+Copying 13 chars to list at index: 13
+
+hostList updated.
+----------------------------------
+Active Hosts List:
+1. 192.168.1.66
+2. 192.168.1.67
+3. 192.168.1.94
+4. 192.168.1.100
+5. 192.168.1.108
+6. 192.168.1.214
+7. 192.168.1.215
+8. 192.168.1.224
+9. 192.168.1.227
+10. 192.168.1.228
+11. 192.168.1.235
+12. 192.168.1.236
+13. 192.168.1.246
+14. 192.168.1.254
+----------------------------------
+*/
