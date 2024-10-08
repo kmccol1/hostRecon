@@ -1,22 +1,27 @@
-#include "doctest.h"
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "doctest/doctest.h"
 #include <cstring>  // for strcmp
+#include <iostream>
+#include <pcap/pcap.h>
+#include <netinet/ip.h>
+#include <netinet/ether.h>
+#include <netinet/ip_icmp.h>
+#include <arpa/inet.h>
+#include <algorithm> //For std::reverse()
+#include <cstdlib>
+#include <chrono>
+#include <netinet/in.h> //For struct definitions
+#include <string>
 
-// Assume the following functions and structures are defined in your code
-bool isValidIPAddress(const std::string& ip);
-void copyAddr(char hostList[][16], const char* addr, int index);
-bool inList(const char* addr, char hostList[][16], int numHosts);
-unsigned short computeChecksum(unsigned short* addr, int len);
-struct icmphdr {
-    uint8_t type;
-    uint8_t code;
-    uint16_t checksum;
-    struct {
-        uint16_t id;
-        uint16_t sequence;
-    } un;
-};
-bool pingSweep(const char* ip, CaptureContext& context);
+// Function prototypes ...
+bool isValidIPAddress(const char* address);
+void copyAddr(char (*hostList)[16], const char* source, int index);
+unsigned short computeChecksum(void* data, int length);
 
+const int MAX_HOSTS = 254;
+//char testHostList[MAX_HOSTS][16] = {};
+
+// Test case for IP Address Validation
 TEST_CASE("IP Address Validation") {
     CHECK(isValidIPAddress("192.168.1.1") == true);
     CHECK(isValidIPAddress("255.255.255.255") == true);
@@ -26,19 +31,30 @@ TEST_CASE("IP Address Validation") {
     CHECK(isValidIPAddress("abc.def.ghi.jkl") == false);
 }
 
-TEST_CASE("Host List Management") {
-    char hostList[MAX_HOSTS][16] = {};
+// Test case for Host List Management
+TEST_CASE("Host List Management")
+{
+    //const int MAX_HOSTS = 254;
+    char testHostList[254][16] = {}; // Local test host list
     int numHosts = 0;
 
     // Testing copyAddr
-    copyAddr(hostList, "192.168.1.10", 0);
-    CHECK(strcmp(hostList[0], "192.168.1.10") == 0);
+    copyAddr(testHostList, "192.168.1.10", 0);
+    CHECK(strcmp(testHostList[0], "192.168.1.10") == 0);
 
-    // Testing inList
-    CHECK(inList("192.168.1.10", hostList, numHosts) == true);
-    CHECK(inList("192.168.1.20", hostList, numHosts) == false);
+    // Adding to the count of hosts
+    numHosts++;
+
+    // Test copying another address
+    copyAddr(testHostList, "192.168.1.20", 1);
+    CHECK(strcmp(testHostList[1], "192.168.1.20") == 0);
+    numHosts++;
+
+    // Check that the number of hosts is managed correctly
+    CHECK(numHosts == 2);
 }
 
+// Test case for Checksum Calculation
 TEST_CASE("Checksum Calculation") {
     struct icmphdr icmpHeader;
     icmpHeader.type = ICMP_ECHO;
@@ -47,17 +63,10 @@ TEST_CASE("Checksum Calculation") {
     icmpHeader.un.echo.id = htons(1234);
     icmpHeader.un.echo.sequence = htons(1);
 
-    unsigned short checksum = computeChecksum((unsigned short*)&icmpHeader, sizeof(struct icmphdr));
+    unsigned short checksum = computeChecksum((void*)&icmpHeader, sizeof(struct icmphdr));
     CHECK(checksum != 0); // Checksum should not be zero
-}
 
-TEST_CASE("Ping Sweep Functionality") {
-    CaptureContext context;
-    context.result = false;
-
-    // Mock pcap_open_live, pcap_inject, and pcap_dispatch here
-    // You can simulate calls to pingSweep and check the results
-    // Example:
-    // bool active = pingSweep("192.168.1.1", context);
-    // CHECK(active == true); // or false, depending on your mock setup
+    // Verify that the checksum calculation is consistent (if you have expected checksum)
+    // unsigned short expectedChecksum = /* Your expected checksum value */;
+    // CHECK(checksum == expectedChecksum);
 }

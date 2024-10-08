@@ -10,11 +10,21 @@ set(CMAKE_PREFIX_PATH "/usr/local")
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(PCAP REQUIRED libpcap)
 
-include_directories(${PCAP_INCLUDE_DIRS})
+# Include directories
+include_directories(${PCAP_INCLUDE_DIRS} include)  # Include the 'include' directory for doctest
 
-add_executable(hostRecon src/networkScanner.cpp)
-target_link_libraries(hostRecon ${PCAP_LIBRARIES})
+# Add the library that contains the implementation
+add_library(hostReconLib src/networkScanner.cpp)
+
+# Add executable for the main application
+add_executable(hostRecon src/main.cpp) # Assuming you have a separate main.cpp file
+target_link_libraries(hostRecon hostReconLib ${PCAP_LIBRARIES})
 
 # Add test executable
 add_executable(test_network_scanner tests/test_network_scanner.cpp)
-target_link_libraries(test_network_scanner ${PCAP_LIBRARIES} doctest)
+target_include_directories(test_network_scanner PRIVATE include)  # Specify where to find doctest.h
+target_link_libraries(test_network_scanner hostReconLib ${PCAP_LIBRARIES})  # Link to the library
+
+# Add testing capabilities
+enable_testing()
+add_test(NAME test_network_scanner COMMAND test_network_scanner)

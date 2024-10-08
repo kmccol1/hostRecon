@@ -24,14 +24,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libpcap-dev  # Install libpcap for your tests
 
-      - name: Build
+      - name: Configure CMake
         run: |
           mkdir build
           cd build
           cmake ..
+
+      - name: Build
+        run: |
+          cd build
           cmake --build .
 
       - name: Run Tests
         run: |
           cd build
-          ./test_network_scanner.cpp
+          ctest --output-on-failure  # Run tests using CTest, this will automatically run your test executables
