@@ -292,53 +292,58 @@ bool isValidIPAddress(const char* address)
 {
     int numDots = 0;
     int numDigits = 0;
+    int currentOctetValue = 0;
     bool result = true;
 
-    if(address == nullptr)
+    if (address == nullptr)
     {
-        result = false;
+        return false;
     }
 
     while (*address)
     {
-        if(*address == '.')
+        if (*address == '.')
         {
-            numDots ++;
+            numDots++;
 
-            if ( (numDigits < 1) || (numDigits > 3) )
+            // After the last digit of an octet, check the octet value
+            if ( ( numDigits == 0 ) || ( numDigits > 3 ) || ( currentOctetValue > 255) )
             {
                 result = false;
             }
 
+            // Reset for next octet
+            currentOctetValue = 0;
             numDigits = 0;
         }
-
-        else if((*address >= '0') && (*address <= '9'))
+        else if ( ( *(address) >= '0') && ( *(address) <= '9') )
         {
-            numDigits ++;
-        }
-        else if(!isalnum(*address) || (!isprint(*address)))
-        {
-            result = false;
+            currentOctetValue = currentOctetValue * 10 + (*address - '0');
+            numDigits++;
         }
         else
         {
-            result = false; //Reject ALL special Unicode characters...
+            result = false;
+            break;
         }
 
         address++;
     }
 
-    //Check if the IP address has 3 dots and is valid...
-    //if (dots != 3 || num < 0 || num > 255)
-    if((numDots != 3) || (numDigits < 1) || (numDigits > 3))
+    // Final validation for the last octet
+    if ( (numDigits == 0) || (numDigits > 3) || (currentOctetValue > 255) )
+    {
+        result = false;
+    }
+
+    // IP should have exactly 3 dots
+    if (numDots != 3)
     {
         result = false;
     }
 
     return result;
 }
-
 //****************************************************************************************
 
 bool inList(const char* address, char (*hostList)[16], int listSize)
