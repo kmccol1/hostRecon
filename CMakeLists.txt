@@ -16,14 +16,14 @@ include_directories(${PCAP_INCLUDE_DIRS} include)
 # Add the library that contains the core implementation
 add_library(hostReconLib src/hostReconLib.cpp)
 
-# Create the main executable, which now only contains the main() function
-add_executable(hostRecon src/networkScanner.cpp)
-target_link_libraries(hostRecon hostReconLib ${PCAP_LIBRARIES})
+# Create the main executable for the network scanner
+add_executable(networkScanner src/networkScanner.cpp)
+target_link_libraries(networkScanner hostReconLib ${PCAP_LIBRARIES})
 
-# Add test executable, link it only with hostReconLib and not networkScanner.cpp
+# Add test executable for doctest, link it with hostReconLib
 add_executable(test_network_scanner tests/test_network_scanner.cpp)
-target_include_directories(test_network_scanner PRIVATE include)  # Specify where to find doctest.h
-target_link_libraries(test_network_scanner hostReconLib ${PCAP_LIBRARIES})  # Link with hostReconLib to resolve undefined references
+target_include_directories(test_network_scanner PRIVATE include)
+target_link_libraries(test_network_scanner hostReconLib ${PCAP_LIBRARIES})
 
 # Add testing capabilities
 enable_testing()

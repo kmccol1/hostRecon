@@ -27,32 +27,90 @@ This repository contains code designed and developed as a CLI-based networking u
 
 ### Prerequisites
 
-- [libpcap](https://www.tcpdump.org/)
-- A C++ compiler (g++, clang, etc.)
-- CMake (optional for build automation)
+To run the **hostRecon** network scanner, you'll need the following:
+
+- **[libpcap](https://www.tcpdump.org/)**:
+  - A packet capture library required for capturing and injecting packets.
+  - Installation can be done via your package manager:
+
+    For Ubuntu/Debian:
+
+    ```bash
+    sudo apt-get install libpcap-dev
+    ```
+
+    For Fedora:
+
+    ```bash
+    sudo dnf install libpcap-devel
+    ```
+
+    For macOS:
+
+    ```bash
+    brew install libpcap
+    ```
+
+- **C++ Compiler**:
+  - A C++ compiler such as `g++`, `clang++`, or any standard C++ compiler.
+
+- **CMake** (Optional for build automation):
+  - While optional, **CMake** is recommended for automating the build process, especially for larger projects.
+  - Installation (for Linux):
+
+    ```bash
+    sudo apt-get install cmake
+    ```
+
+    For macOS:
+
+    ```bash
+    brew install cmake
+    ```
 
 ### Steps
 
 1. Clone this repository:
 
-   ```bash
-   https://github.com/kmccol1/hostRecon.git
-   cd network-scanner
+   \`\`\`bash
+   git clone https://github.com/kmccol1/hostRecon.git
+   cd hostRecon
+   \`\`\`
 
-2. Compile the project:
+2. Create a `build` directory and navigate into it:
 
-   ```bash
-   g++ networkScanner.cpp -o networkScanner -lpcap
+   \`\`\`bash
+   mkdir build
+   cd build
+   \`\`\`
 
-3. Run the scanner with appropriate privileges (usually as root):
+3. Compile the project using CMake:
 
-   ```bash
+   \`\`\`bash
+   cmake ..
+   make
+   \`\`\`
+
+4. Run the scanner with appropriate privileges (usually as root):
+
+   \`\`\`bash
    sudo ./networkScanner
+   \`\`\`
 
-Usage
+5. (Optional) Run the tests:
+
+   To run the tests, execute the following:
+
+   \`\`\`bash
+   ./test_network_scanner
+   \`\`\`
+"""
+
+## Usage
 
 To use hostRecon, simply run the compiled executable. The tool will automatically scan the local subnet for active hosts and display the results.
-Current State
+
+## Current State
 
 As of now, the hostRecon successfully provides:
 
@@ -67,7 +125,7 @@ The tool is currently focused on:
     Basic Host Discovery: Scanning a predefined range of IP addresses (192.168.1.93 to 192.168.1.95).
     Single-threaded Operation: Performing pings sequentially, limiting the speed of discovery.
 
-Future State
+## Future State
 
 In the upcoming versions, we plan to enhance hostRecon with the following features:
 
@@ -78,10 +136,10 @@ In the upcoming versions, we plan to enhance hostRecon with the following featur
     Improved Error Handling: Handle different network errors more gracefully with user feedback.
     Graphical User Interface (GUI): Explore a GUI option for easier user interaction and visual representation of the network status.
 
-Contributing
+## Contributing
 
 Contributions are welcome! Please read the CONTRIBUTING.md file for guidelines on how to contribute to this project.
 
-License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
