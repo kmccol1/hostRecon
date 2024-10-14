@@ -1,6 +1,15 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest/doctest.h"
 #include <cstring>  // for strcmp
+//****************************************************************************************
+//
+//    Filename:    test_network_scanner.cpp
+//    Author:      Kyle McColgan
+//    Date:        14 October 2024
+//    Description: CLI based networking utility for local network host enumeration tests.
+//
+//****************************************************************************************
+
 #include <iostream>
 #include <pcap/pcap.h>
 #include <netinet/ip.h>
@@ -13,13 +22,19 @@
 #include <netinet/in.h> //For struct definitions
 #include <string>
 
+//****************************************************************************************
+
 // Function prototypes ...
 bool isValidIPAddress(const char* address);
 void copyAddr(char (*hostList)[16], const char* source, int index);
 unsigned short computeChecksum(void* data, int length);
 
+//****************************************************************************************
+
 const int MAX_HOSTS = 254;
 //char testHostList[MAX_HOSTS][16] = {};
+
+//****************************************************************************************
 
 // Test case for IP Address Validation
 TEST_CASE("IP Address Validation") {
@@ -70,3 +85,5 @@ TEST_CASE("Checksum Calculation") {
     // unsigned short expectedChecksum = /* Your expected checksum value */;
     // CHECK(checksum == expectedChecksum);
 }
+
+//****************************************************************************************

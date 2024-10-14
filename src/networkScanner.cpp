@@ -2,7 +2,7 @@
 //
 //    Filename:    networkScanner.cpp
 //    Author:      Kyle McColgan
-//    Date:        7 October 2024
+//    Date:        14 October 2024
 //    Description: CLI based networking utility for local network host enumeration.
 //
 //****************************************************************************************
@@ -24,20 +24,30 @@ int main()
     pcap_t * sendSession;
     int timeout = 2000; //Timeout value in milliseconds.
 
+    std::cout << " _               _   ____                          \n";
+    std::cout << "| |__   ___  ___| |_|  _ \\ ___  ___ ____   _____  \n";
+    std::cout << "| '_ \\/ _ \\/ __| __| |_) / _ \\/ __/ _ \\| '_ \\ \n";
+    std::cout << "| | |  | (_) \\__ \\ |_|  _ <  __/ (_| (_) | | | | \n";
+    std::cout << "|_| |_|\\___/|___/\\__|_| \\_\\___|\\____/\\_|_| |_| \n";
+    cout << "----------------------------------\n";
+
     //Open session handlers with a timeout of 1000 ms...
+    cout << "Initializing network interface sessions...\n";
     sendSession = pcap_open_live("enp34s0", BUFSIZ, 0, timeout, sendErrorMsg);
     captureSession = pcap_open_live("enp34s0", BUFSIZ, 0, timeout, capErrorMsg);
 
     if(sendSession == nullptr)
     {
-        cout << "Error accessing the network interface for injection: " << sendErrorMsg << endl;
+        cerr << "[ERROR] Could not access network interface for injection: " << sendErrorMsg << endl;
         return 1;
     }
     else if (captureSession == nullptr)
     {
-        cout << "Error accessing the network interface for capture: " << capErrorMsg << endl;
+        cerr << "[ERROR] Could not access the network interface for capture: " << capErrorMsg << endl;
         return 1;
     }
+
+    cout << "[OK] Network interfaces initialized successfully!\n";
 
     //Set the filter for ICMP packets
     struct bpf_program filter;
@@ -47,11 +57,13 @@ int main()
     // char filterExp[] = "icmp and icmp[icmptype] == 0";
     //char filterExp[] = "icmp[icmpcode] == 0 and icmp[icmptype] == 0";
 
+    cout << "Applying ICMP filter...\n";
+
     //Compile the filter expression...
     if (pcap_compile(captureSession, &filter, filterExp, 0, net) == -1)
     {
-        cout << "Could not parse filter: " << filterExp << ": "
-             << pcap_geterr(captureSession) << endl;
+        cerr << "[ERROR] Failed to compile filter: " << filterExp << "\n";
+        cerr << "       " << pcap_geterr(captureSession) << "\n";
 
         return 1;
     }
@@ -59,25 +71,32 @@ int main()
     //Apply the filter expression...
     if (pcap_setfilter(captureSession, &filter) == -1)
     {
-        cout << "Could not install filter: " << filterExp << ": "
-             << pcap_geterr(captureSession) << endl;
+        cerr << "[ERROR] Failed to apply filter: " << filterExp << "\n";
+        cerr << "       " << pcap_geterr(captureSession) << "\n";
 
         return 1;
     }
 
-    cout << "\nFilter applied successfully!" << endl;
-    cout << "----------------------------------" << endl;
+    cout << "[OK] ICMP filter applied successfully!\n";
+    //cout << "----------------------------------" << endl;
 
+    cout << "\nStarting host discovery...\n";
     CaptureContext context{captureSession, result, .sendSession=sendSession};
 
     getHosts(hostList, numHosts, context);
     cout << "----------------------------------" << endl;
+
+    cout << "Host discovery completed.\n";
     displayHostList(hostList, numHosts);
 
+    cout << "\nReleasing resources...\n";
     pcap_freecode(&filter);
-
     pcap_close(context.captureSession);
     pcap_close(context.sendSession);
+    cout << "[OK] Resources released successfully.\n";
+
+    cout << "Scan complete.\n";
+    cout << "----------------------------------\n";
 
     return 0;
 }
@@ -85,6 +104,17 @@ int main()
 //****************************************************************************************
 
 /*
+ _               _   ____
+| |__   ___  ___| |_|  _ \ ___  ___ ____   _____
+| '_ \/ _ \/ __| __| |_) / _ \/ __/ _ \| '_ \
+| | |  | (_) \__ \ |_|  _ <  __/ (_| (_) | | | |
+|_| |_|\___/|___/\__|_| \_\___|\____/\_|_| |_|
+----------------------------------
+Initializing network interface sessions...
+[OK] Network interfaces initialized successfully!
+Applying ICMP filter...
+[OK] ICMP filter applied successfully!
+
 No response.
 Host 192.168.1.253 is inactive.
 
