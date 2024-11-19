@@ -1,8 +1,11 @@
+
 # hostRecon
+
+![Build Status](https://img.shields.io/github/workflow/status/kmccol1/hostRecon/CI?logo=github)
 
 ## Overview
 
-This repository contains code designed and developed as a CLI-based networking utility to facilitate local network host enumeration. It allows users to ping hosts within a specified subnet to determine their availability, leveraging low-level packet manipulation with `libpcap`. This tool is ideal for network administrators, security professionals, and anyone interested in exploring their local network.
+**hostRecon** is a fast, efficient, and easy-to-use CLI-based network scanner that facilitates host discovery and availability checks on local networks. Leveraging the power of `libpcap`, this tool performs network reconnaissance through ICMP Echo Request (ping) messages and captures responses from live hosts. It’s a valuable tool for network administrators, cybersecurity professionals, and anyone wanting to explore their local network.
 
 ## Table of Contents
 
@@ -16,22 +19,22 @@ This repository contains code designed and developed as a CLI-based networking u
 
 ## Features
 
-- Efficient ICMP Echo Request (ping) implementation
-- Captures and analyzes responses from active hosts
-- Customizable source and destination IP addresses
-- Concurrent pinging of multiple hosts
-- Error handling for network interface and packet capturing
-- User-friendly output for active hosts
+- **Fast & Efficient**: Designed for quick host discovery via ICMP Echo Requests.
+- **Low-Level Packet Manipulation**: Uses `libpcap` for low-level packet capture and injection.
+- **Multi-Host Scanning**: Allows the concurrent scanning of multiple hosts to save time.
+- **Customizable Network Configuration**: Set custom source and destination IP addresses.
+- **Real-Time Active Host Display**: Instantly shows hosts that are up and responsive.
+- **Error Resilience**: Includes robust error handling for packet capture failures and network interface issues.
 
 ## Installation
 
 ### Prerequisites
 
-To run the **hostRecon** network scanner, you'll need the following:
+To run **hostRecon**, you will need the following:
 
 - **[libpcap](https://www.tcpdump.org/)**:
   - A packet capture library required for capturing and injecting packets.
-  - Installation can be done via your package manager:
+  - Install via your package manager:
 
     For Ubuntu/Debian:
 
@@ -72,74 +75,79 @@ To run the **hostRecon** network scanner, you'll need the following:
 
 1. Clone this repository:
 
-   \`\`\`bash
+   ```bash
    git clone https://github.com/kmccol1/hostRecon.git
    cd hostRecon
-   \`\`\`
+   ```
 
 2. Create a `build` directory and navigate into it:
 
-   \`\`\`bash
+   ```bash
    mkdir build
    cd build
-   \`\`\`
+   ```
 
 3. Compile the project using CMake:
 
-   \`\`\`bash
+   ```bash
    cmake ..
    make
-   \`\`\`
+   ```
 
 4. Run the scanner with appropriate privileges (usually as root):
 
-   \`\`\`bash
+   ```bash
    sudo ./networkScanner
-   \`\`\`
+   ```
 
 5. (Optional) Run the tests:
 
    To run the tests, execute the following:
 
-   \`\`\`bash
+   ```bash
    ./test_network_scanner
-   \`\`\`
-"""
+   ```
 
 ## Usage
 
-To use hostRecon, simply run the compiled executable. The tool will automatically scan the local subnet for active hosts and display the results.
+Once compiled, **hostRecon** can be run from the command line. The tool will automatically detect and scan the local subnet for active hosts, displaying the list of hosts that respond to the ICMP Echo Request.
+
+### Example:
+
+```bash
+sudo ./networkScanner
+```
+
+The tool will output the list of active hosts in your local network.
 
 ## Current State
 
-As of now, the hostRecon successfully provides:
+As of now, **hostRecon** provides the following functionality:
 
-    Establishes a capture session to listen for ICMP Echo Replies.
-    Constructs and sends ICMP Echo Request packets to specified IP addresses within a /24 subnet.
-    Captures responses and accurately determines the active hosts based on received packets.
-    Displays the list of active hosts in a clear and concise format.
+- Establishes a capture session to listen for ICMP Echo Replies.
+- Constructs and sends ICMP Echo Request packets to specified IP addresses in a /24 subnet.
+- Captures responses and accurately identifies active hosts based on received packets.
+- Displays the results in a clear and concise format.
 
-The tool is currently focused on:
-
-    ICMP Protocol: Handling only ICMP packets to identify live hosts.
-    Basic Host Discovery: Scanning a predefined range of IP addresses (192.168.1.93 to 192.168.1.95).
-    Single-threaded Operation: Performing pings sequentially, limiting the speed of discovery.
+### Current Limitations:
+- **Single-threaded Operation**: Scans hosts sequentially, which may limit speed in larger networks.
+- **Limited Protocol Support**: Currently supports only ICMP-based host discovery.
 
 ## Future State
 
-In the upcoming versions, we plan to enhance hostRecon with the following features:
+In future releases, we plan to add:
 
-    Multi-threading Support: Implement concurrent pings to improve scanning speed and efficiency.
-    Configurable Subnet: Allow users to specify the IP range and subnet mask dynamically.
-    Advanced Protocol Support: Expand capabilities to include TCP/UDP port scanning.
-    Detailed Reporting: Generate reports with additional information (e.g., response time, packet loss).
-    Improved Error Handling: Handle different network errors more gracefully with user feedback.
-    Graphical User Interface (GUI): Explore a GUI option for easier user interaction and visual representation of the network status.
+- **Multi-threaded Support**: Enable concurrent pinging for faster scans, improving efficiency.
+- **Configurable Subnets**: Allow users to specify the IP range and subnet dynamically.
+- **Expanded Protocols**: Include TCP/UDP port scanning and other protocols.
+- **Detailed Reporting**: Enhance reporting features, providing additional data like response times and packet loss.
+- **Improved Error Handling**: Offer better feedback for various network-related errors.
+- **Graphical User Interface (GUI)**: Implement a GUI for a more user-friendly experience.
 
 ## Contributing
 
-Contributions are welcome! Please read the CONTRIBUTING.md file for guidelines on how to contribute to this project.
+We welcome contributions from the community! Whether it’s submitting bug reports, suggesting new features, or contributing code, your input is valuable. Please refer to the [CONTRIBUTING.md](CONTRIBUTING.md) file for guidelines on how to contribute.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
