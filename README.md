@@ -1,4 +1,4 @@
-![Workflow Status](https://github.com/your-username/your-repo/actions/workflows/cpp.yml/badge.svg)
+![Workflow Status](https://github.com/kmccol1/hostRecon/actions/workflows/cpp.yml/badge.svg)
 
 # hostRecon
 
