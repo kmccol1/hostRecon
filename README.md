@@ -1,7 +1,6 @@
+![Workflow Status](https://github.com/your-username/your-repo/actions/workflows/cpp.yml/badge.svg)
 
 # hostRecon
-
-![Build Status](https://img.shields.io/github/workflow/status/kmccol1/hostRecon/CI?logo=github)
 
 ## Overview
 
